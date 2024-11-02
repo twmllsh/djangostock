@@ -1,0 +1,22 @@
+-r common.txt
+numpy==1.24  # 적절한 numpy 버전
+TA-Lib
+asgiref==3.8.1
+dj-database-url==2.2.0
+Django==5.1.1
+psycopg2-binary==2.9.9
+sqlparse==0.5.1
+typing_extensions==4.12.2
+pandas==2.2.3
+yfinance==0.2.44
+pandas-ta==0.3.14b0
+# environ
+pymysql
+fake-useragent==0.1.13
+finance-datareader
+plotly
+discord.py==2.4.0
+python-telegram-bot==21.6
+django-apscheduler==0.7.0
+django-environ
+django-bootstrap5==24.3

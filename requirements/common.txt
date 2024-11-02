@@ -1,0 +1,9 @@
+Django==5.1.1
+django-extensions==3.2.3
+django-environ==0.11.2
+django-template-partials==24.4
+bokeh==3.6.0
+# finance-datareader
+beautifulsoup4 
+pykrx
+django-model-utils

@@ -1,0 +1,6 @@
+-r common.txt
+-r prod.txt
+django-debug-toolbar==4.4.6
+ipython
+nbformat==5.10.4
+
