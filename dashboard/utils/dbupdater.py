@@ -428,8 +428,8 @@ class DBUpdater:
             ## 데이터 모두 먼저 지우기
             Ohlcv.objects.all().delete()
             with connection.cursor() as cursor:
-                cursor.execute("CREATE SEQUENCE IF NOT EXISTS ohlcv_id_seq;")
-                cursor.execute("ALTER TABLE ohlcv ALTER COLUMN id SET DEFAULT nextval('ohlcv_id_seq');")
+                cursor.execute("CREATE SEQUENCE IF NOT EXISTS dashboard_ohlcv_id_seq;")
+                cursor.execute("ALTER TABLE ohlcv ALTER COLUMN id SET DEFAULT nextval('dashboard_ohlcv_id_seq');")
             print('ohlcv id 초기화 성공!!!!!!!!')
             
             to_create_add = []
