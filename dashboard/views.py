@@ -63,9 +63,9 @@ def dcheduler_update_stockplus_news():
 @sched.scheduled_job('cron', day_of_week=0,  hour=8, minute=0)
 def dcheduler_update_theme_upjong():
     DBUpdater.update_theme_upjong()
-    
-    
-sched.start()
+
+if not settings.DEBUG:
+    sched.start()
 ##########################sceduler end!  ##################################
 
 
