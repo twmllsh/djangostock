@@ -49,5 +49,6 @@ class MyDiscordBot(commands.Bot):
 
 # 봇 실행
 if __name__ == '__main__':
-    bot = MyDiscordBot()
-    bot.run_bot()
+    if not settings.DEBUG:
+        bot = MyDiscordBot()
+        bot.run_bot()

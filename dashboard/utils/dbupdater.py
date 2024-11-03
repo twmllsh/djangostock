@@ -423,7 +423,7 @@ class DBUpdater:
             exist_ticker_dict = {ticker.code: ticker for ticker in tickers}
 
             
-            start_date = pd.Timestamp.now().date() - pd.Timedelta(days=500)
+            start_date = pd.Timestamp.now().date() - pd.Timedelta(days=750)
 
             ## 데이터 모두 먼저 지우기
             Ohlcv.objects.all().delete()
@@ -454,16 +454,16 @@ class DBUpdater:
                             to_create_add.append(ohlcv)
                             ticker_list.append(code)
                     
-                    if len(ticker_list) > 10: ## 10개씩 삭제 저장! 
-                        ## 한 종목씩 저장하는 방식. 
-                        with transaction.atomic():
-                            # 기존 데이터 삭제
-                            print(f"{ticker_list} db에 데이터 삭제 및 데이터 삽입 작업....")
-                            # 새로운 데이터 일괄 삽입
-                            Ohlcv.objects.bulk_create(to_create_add, batch_size=1000)
-                        to_create_add = []
-                        ticker_list = []
-                        print('저장완료')
+                if len(ticker_list) > 10: ## 10개씩 삭제 저장! 
+                    ## 한 종목씩 저장하는 방식. 
+                    with transaction.atomic():
+                        # 기존 데이터 삭제
+                        print(f"{ticker_list} db에 데이터 삭제 및 데이터 삽입 작업....")
+                        # 새로운 데이터 일괄 삽입
+                        Ohlcv.objects.bulk_create(to_create_add, batch_size=1000)
+                    to_create_add = []
+                    ticker_list = []
+                    print('저장완료')
             print("finished!! ")
 
           

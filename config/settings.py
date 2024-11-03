@@ -19,13 +19,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 # 자체적으로 docker compose 에 의해 환경변수가 설정되었으니 파일로 읽어오지 않아도 된다. 
-# ENV_PATH = BASE_DIR / ".env"
-
-# if ENV_PATH.exists():
-#     with ENV_PATH.open(encoding="utf-8") as f:
-#         MYENV.read_env(f, overwrite=True)
-# else:
-#     print(":", ENV_PATH, file=sys.stderr)
+ENV_PATH = BASE_DIR / ".env"
+if ENV_PATH.exists():
+    with ENV_PATH.open(encoding="utf-8") as f:
+        MYENV.read_env(f, overwrite=True)
+else:
+    print(":", ENV_PATH, file=sys.stderr)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/

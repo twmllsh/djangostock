@@ -51,6 +51,8 @@ COPY . .
 
 # 포트 설정 (디폴트는 8000)
 EXPOSE 8000
+EXPOSE 8888
+
 
 # 7. 컨테이너 시작 시 실행할 명령어
 # CMD sh -c "python app.py && tail -f /dev/null"
