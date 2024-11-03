@@ -458,22 +458,14 @@ class DBUpdater:
                             Ohlcv.objects.bulk_create(to_create_add, batch_size=1000)
                             to_craete_add = []
                             ticker_list = []
+                            print('저장완료')
             print("finished!! ")
 
-            ## 전체 저장하는 방식. 메모리 문제!!
-            ## 삭제 및 삽입 시작 
-            print("db에 데이터 삭제 및 데이터 삽입 작업....")
-            with transaction.atomic():
-                # 기존 데이터 삭제
-                Ohlcv.objects.filter(ticker_id=code).delete()
-                # 새로운 데이터 일괄 삽입
-                Ohlcv.objects.bulk_create(to_create_add, batch_size=1000)
-                to_craete_add = []
-            print("finished!! ")
+          
 
         # 금요일이면 _all_data_from_fdr 실행하기.
         today = pd.Timestamp.now()
-        if today.weekday() == 5:  # 토요일이면
+        if today.weekday() == 6:  # 토요일이면
             # if today.weekday() ==4: # 0 :월
             print("전체 데이터 fdr 작업중.....")
             _all_data_from_fdr()
