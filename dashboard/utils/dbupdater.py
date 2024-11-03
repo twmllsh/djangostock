@@ -439,6 +439,7 @@ class DBUpdater:
             for code in df['ticker_id']:
                 ticker_obj = exist_ticker_dict.get(code)
                 if ticker_obj:
+                    print(ticker_obj.name, '...')
                     data = fdr.DataReader(code, start=start_date)
                     if len(data):
                         for date, row in data.iterrows():
@@ -466,9 +467,11 @@ class DBUpdater:
         
         # 금요일이면 _all_data_from_fdr 실행하기. 
         today = pd.Timestamp.now()
-        if today.weekday() ==6:
+        if today.weekday() ==5: # 토요일이면
         # if today.weekday() ==4: # 0 :월 
+            print('전체 데이터 fdr 작업중.....')
             _all_data_from_fdr()
+            
             return 
         
         data = Ohlcv.objects.first()

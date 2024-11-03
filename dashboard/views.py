@@ -40,11 +40,11 @@ sched : BackgroundScheduler = BackgroundScheduler()
 def scheduler_ticker():
     DBUpdater.update_ticker()
     
-@sched.scheduled_job('cron', day_of_week="0-4", hour=20, minute=58)
+@sched.scheduled_job('cron', day_of_week="0-5", hour=15, minute=55) # 토요일 전체 데이터 새로 받기.
 def scheduler_ohlcv():
     DBUpdater.update_ohlcv()
     
-@sched.scheduled_job('cron', day_of_week="0-4", hour=17, minute=10)
+@sched.scheduled_job('cron', day_of_week="0-4", hour=16, minute=5)
 def dcheduler_basic_info():
     DBUpdater.update_basic_info()
 
