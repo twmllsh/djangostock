@@ -422,9 +422,7 @@ class DBUpdater:
             tickers = Ticker.objects.all()
             exist_ticker_dict = {ticker.code: ticker for ticker in tickers}
 
-            qs = Ohlcv.objects.prefetch_related("ticker")
-            df = pd.DataFrame(qs.values())
-
+            
             start_date = pd.Timestamp.now().date() - pd.Timedelta(days=500)
 
             ## 데이터 모두 먼저 지우기
@@ -435,8 +433,7 @@ class DBUpdater:
             
             to_create_add = []
             ticker_list = []
-            for code in df["ticker_id"]:
-                ticker_obj = exist_ticker_dict.get(code)
+            for code, ticker_obj in exist_ticker_dict:
                 if ticker_obj:
                     print(ticker_obj.name, "...")
                     data = fdr.DataReader(code, start=start_date)
