@@ -429,8 +429,8 @@ class DBUpdater:
 
             ## 데이터 모두 먼저 지우기
             Ohlcv.objects.all().delete()
-            with connection.cursor() as cursor:
-                cursor.execute("ALTER SEQUENCE Ohlcv_id_seq RESTART WITH 1;")
+            # with connection.cursor() as cursor:
+            #     cursor.execute("ALTER SEQUENCE Ohlcv_id_seq RESTART WITH 1;")
             
             
             to_create_add = []
