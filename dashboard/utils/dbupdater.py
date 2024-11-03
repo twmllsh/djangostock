@@ -23,6 +23,7 @@ from django.db import transaction
 from django.conf import settings
 from django.db.models import Max
 from django.db import DatabaseError
+from django.db import connection
 from dashboard.models import *
 from dashboard.utils.sean_func import Text_mining
 from .message import My_discord
@@ -426,6 +427,12 @@ class DBUpdater:
 
             start_date = pd.Timestamp.now().date() - pd.Timedelta(days=500)
 
+            ## 데이터 모두 먼저 지우기
+            Ohlcv.objects.all().delete()
+            with connection.cursor() as cursor:
+                cursor.execute("ALTER SEQUENCE mymodel_id_seq RESTART WITH 1;")
+            
+            
             to_create_add = []
             ticker_list = []
             for code in df["ticker_id"]:
@@ -446,14 +453,13 @@ class DBUpdater:
                                 Change=row["Change"],
                             )
                             to_create_add.append(ohlcv)
-                            ticker_list.append(code)
+                            ticker_list.append(ticker)
                     
                     if len(ticker_list) > 10: ## 10개씩 삭제 저장! 
                         ## 한 종목씩 저장하는 방식. 
                         with transaction.atomic():
                             # 기존 데이터 삭제
                             print(f"{ticker_list} db에 데이터 삭제 및 데이터 삽입 작업....")
-                            Ohlcv.objects.filter(ticker_id__in=ticker_list).delete()
                             # 새로운 데이터 일괄 삽입
                             Ohlcv.objects.bulk_create(to_create_add, batch_size=1000)
                             to_craete_add = []
