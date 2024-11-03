@@ -353,7 +353,7 @@ class Line():
         ww_cond = False
         if len(self.df_last_low_points):
             ww_cond1 = len(self.df_last_low_points) > 0  # 마지막 저점리스트가 0개 이상이다.
-            ww_cond2 = self.df_all_high_points.index[-1] > self.df_all_low_points.index[-1] # 최근이 고점이다.
+            ww_cond2 = self.df_all_high_points.index[-1] > self.df_all_low_points.index[-1] if len(self.df_all_high_points) else False # 최근이 고점이다.
             ww_cond3 = self.df_all_low_points[self._value_column].iloc[-1] <= self.df_curve[self.name].iloc[-1]  ## 전저점 지키는 중이다.
             up_cond4 = self.current_direction == 'down'
             ## 단봉이거나. 기울기가 변하는 중이거나 현재가가 ma위로 뚫은것들만 
@@ -1089,12 +1089,17 @@ class Candle():
         '''
         dic={}
         all_len = h-l
-        head_len = h - max(o,c)
-        body_len = max(o,c)-min(o,c)
-        tail_len = min(o,c)-l
-        head_rate = round(head_len/all_len*100,0)
-        body_rate = round(body_len/all_len*100,0)
-        tail_rate = round(tail_len/all_len*100,0)
+        if all_len ==0:
+            head_rate = 0
+            body_rate = 0
+            tail_rate = 0
+        else:
+            head_len = h - max(o,c)
+            body_len = max(o,c)-min(o,c)
+            tail_len = min(o,c)-l
+            head_rate = round(head_len/all_len*100,0)
+            body_rate = round(body_len/all_len*100,0)
+            tail_rate = round(tail_len/all_len*100,0)
 
         ## 비율이기 때문에 크기에 대한 수치가 필요함. ....
         
@@ -1458,8 +1463,8 @@ class Chart():
         result = False
         results = [hasattr(self, item) for item in ['ma20', "ma3"]]
         if all(results):
-            ma3 : Ma = getattr('ma3')
-            ma20 : Ma = getattr('ma20')
+            ma3 : Ma = getattr(self, 'ma3')
+            ma20 : Ma = getattr(self, 'ma20')
             result = ma3.is_w(verbose=verbose) and (ma20.is_w(verbose=verbose) or ma20.is_wa(verbose=verbose))
             
         return result

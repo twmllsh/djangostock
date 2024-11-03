@@ -341,7 +341,7 @@ class DBUpdater:
 
         
         asyncio.run(mydiscord.send_message(f'update_ticker finished!!'))
-        
+        return datas
         
         
     def ohlcv_from_backupfile_to_db(backup_file_name, backup_codes : List[str] = None):
@@ -417,10 +417,59 @@ class DBUpdater:
 
     def update_ohlcv():
         
+        
+        
+        
         print('====================================')
         print('update_ohlcv running.......')
         print('====================================')
         asyncio.run(mydiscord.send_message(f'update_ohlcv running..'))
+        
+        def _all_data_from_fdr():
+            ## 만약 금요일이면,  전체데이터 새로 fdr로 받기. 
+            tickers = Ticker.objects.all()
+            exist_ticker_dict = {ticker.code:ticker for ticker in tickers}
+            
+            qs = Ohlcv.objects.prefetch_related('ticker')
+            df = pd.DataFrame(qs.values())
+
+            start_date =pd.Timestamp.now().date() - pd.Timedelta(days=500)
+            
+            to_create_add = []
+            for code in df['ticker_id']:
+                ticker_obj = exist_ticker_dict.get(code)
+                if ticker_obj:
+                    data = fdr.DataReader(code, start=start_date)
+                    if len(data):
+                        for date, row in data.iterrows():
+                            ohlcv = Ohlcv(
+                                ticker=ticker_obj,
+                                Date=date,
+                                Open=row["Open"],
+                                High=row["High"],
+                                Low=row["Low"],
+                                Close=row["Close"],
+                                Volume=row["Volume"],
+                                Change=row["Change"],
+                            )
+                            to_create_add.append(ohlcv)
+
+            ## 삭제 및 삽입 시작
+            print('db에 데이터 삭제 및 데이터 삽입 작업....')
+            with transaction.atomic():
+                # 기존 데이터 삭제
+                Ohlcv.objects.filter(ticker_id=code).delete()
+                # 새로운 데이터 일괄 삽입
+                Ohlcv.objects.bulk_create(to_create_add, batch_size=1000)
+                to_craete_add= []
+            print('finished!! ')
+        
+        # 금요일이면 _all_data_from_fdr 실행하기. 
+        today = pd.Timestamp.now()
+        if today.weekday() ==6:
+        # if today.weekday() ==4: # 0 :월 
+            _all_data_from_fdr()
+            return 
         
         data = Ohlcv.objects.first()
         if not data:
@@ -558,39 +607,9 @@ class DBUpdater:
         asyncio.run(mydiscord.send_message(f'update_ohlcv finished!!'))
 
 
-        ## ohlcv 가 100개 이하인것들. 처리. 
-        
-        qs = Ohlcv.objects.prefetch_related('ticker')
-        df = pd.DataFrame(qs.values())
-        
-        print('to_create_add 작업 시작. 100개 가 되지 않는것들 새로 받아서 채워넣기. ')
-        to_create_add = []
-        for ticker, group in df.groupby('ticker_id'):
-            if len(group) < 100:
-                end_date = Ohlcv.objects.filter(ticker_id=ticker).first().Date - pd.Timedelta(days=1)
-                data = fdr.DataReader(ticker, end=end_date)
-                print(ticker , 'checking...')
-                if len(data):
-                    print(f'{ticker} 데이터 가져오기....')
-                    ticker_obj = Ticker.objects.get(code=ticker)
-                    for date, row in data.iterrows():
-                        ohlcv = Ohlcv(
-                            ticker=ticker_obj,
-                            Date=date,
-                            Open=row["Open"],
-                            High=row["High"],
-                            Low=row["Low"],
-                            Close=row["Close"],
-                            Volume=row["Volume"],
-                            Change=row["Change"],
-                        )
-                        to_create_add.append(ohlcv)
-        
-        ## bulk_create
-        print('to_create_add bulk job....')
-        Ohlcv.objects.bulk_create(to_create_add)
-        print('to_create_add bulk job....complete! ')
-        
+                
+            
+            
                     
             
         

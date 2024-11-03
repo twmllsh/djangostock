@@ -1,52 +1,35 @@
-{% extends 'dashboard/base.html' %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard</title>
+</head>
+<body>
+    <div style="display: flex;">
+        <div style="width: 30%;">
+            <form method="get">
+                <h3>조건 선택</h3>
+                <label><input type="checkbox" name="condition" value="조건1"> 조건1</label><br>
+                <label><input type="checkbox" name="condition" value="조건2"> 조건2</label><br>
+                <button type="submit">필터 적용</button>
+            </form>
+            <h3>아이템 리스트</h3>
+            {% comment %} {{ items }}
+            {% for item in items %}
+                <p> {{item.code}}  {{item.name}}  </p>
+            {% endfor %} {% endcomment %}
 
-{% comment %} {% block title %}Dashboard{% endblock %} {% endcomment %}
-
-{% block left_content %}
-    <div class="row">
-        <div class="container">
             <ul>
-                {% if categories %}
-                    {% for category in categories %}
-                    <div class="col-md-4">
-                        <li>{{category}}</li>
-                    </div>
-                    {% endfor %}
-                {% endif %}
-            </ul>
+                {% for item in items %}
+                    <li> <a href="{% url 'dashboard:detail' item.code %}"> {{ item.name }} </a> </li>
+                {% endfor %}
+            </ul> 
+        </div>
+        <div style="width: 70%;">
+            <h3>상세 정보</h3>
+            <!-- 여기에 상세 정보가 표시될 자리 -->
+            {% block content %}{% endblock %}
         </div>
     </div>
-{% endblock %}
-
-{% block right_content %}
-<div class="row">
-    <div class="container">
-        <h2>Details for Item 1</h2>
-        <p>Information about the selected item will be displayed here.</p>
-        <div id="chart">
-            <!-- 차트를 그릴 부분 -->
-            <canvas id="myChart"></canvas>
-        </div>
-    </div>
-</div>
-{% endblock %}
-
-{% block extra_js %}
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script>
-        var ctx = document.getElementById('myChart').getContext('2d');
-        var myChart = new Chart(ctx, {
-            type: 'bar', // 차트 타입
-            data: {
-                labels: ['January', 'February', 'March', 'April', 'May', 'June', 'July'],
-                datasets: [{
-                    label: 'Sales',
-                    data: [12, 19, 3, 5, 2, 3, 9],
-                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                    borderColor: 'rgba(75, 192, 192, 1)',
-                    borderWidth: 1
-                }]
-            }
-        });
-    </script>
-{% endblock %}
+</body>
+</html>

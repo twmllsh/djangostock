@@ -118,11 +118,7 @@ class Stock:
         fin_df_q['index'] = fin_df_q['year'].astype(str) + "/" + fin_df_q['quarter'].astype(str).str.zfill(2)
         fin_df_q = fin_df_q.set_index("index")
         
-        
-  
-            
-       
-        
+
     # 날짜범위와 계산값 반환.  to_list or  dict
     def get_investor_part(self):
  
@@ -369,35 +365,34 @@ class Stock:
         # std60 = df.close.rolling(60).std()
         # upper = ma60 + 2 * std60
         # lower = ma60 - 2 * std60
-        upper = getattr(chart, 'bb60').upper
-        lower = getattr(chart, 'bb60').lower
-        
-        
-        p1.multi_line(xs=[upper.index, lower.index],
-                    ys=[upper, lower],
-                    color="#f6b2b1",
-                    alpha=0.8,
-                    line_width=2,
-                    legend_label='BB',
-                    )
+        for bb in ['bb60', 'bb240']:
+            if hasattr(chart, bb):
+                bb_object = getattr(chart, bb)
+                upper , lower = bb_object.upper, bb_object.lower
+                p1.multi_line(xs=[upper.index, lower.index],
+                            ys=[upper, lower],
+                            color="#f6b2b1",
+                            alpha=0.8,
+                            line_width=2,
+                            legend_label='BB',
+                            )
 
         ## sun
         # ma20 = df.close.rolling(20).mean()
         # std20 = df.close.rolling(20).std()
         # sun_max = ma20 + 2 * std20
         # sun_low = ma20 - 2 * std20
-        sun_max = getattr(chart, 'sun').line_max.data
-        sun_min = getattr(chart, 'sun').line_min.data
-        p1.varea(
-            x=sun_max.index,
-            y1= sun_max,
-            y2= sun_min,
-            color='#bfd8f6',
-            alpha=0.5,
-            legend_label='mesh'
-            )
-
-
+        if hasattr(chart, 'sun'):
+            sun_object = getattr(chart, 'sun')
+            sun_max, sun_min = sun_object.line_max.data, sun_object.line_min.data
+            p1.varea(
+                x=sun_max.reset_index().index,
+                y1= sun_max,
+                y2= sun_min,
+                color='#bfd8f6',
+                alpha=0.5,
+                legend_label='mesh'
+                )
 
         # # 거래량 차트 그리기
         p2 = figure( width=800, height=150, x_range=p1.x_range, toolbar_location=None)  # x_range를 공유해서 차트가 일치하게 만듦
