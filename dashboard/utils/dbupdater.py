@@ -450,7 +450,7 @@ class DBUpdater:
                                 Change=row["Change"],
                             )
                             to_create_add.append(ohlcv)
-                            ticker_list.append(ticker)
+                            ticker_list.append(code)
                     
                     if len(ticker_list) > 10: ## 10개씩 삭제 저장! 
                         ## 한 종목씩 저장하는 방식. 
@@ -459,9 +459,9 @@ class DBUpdater:
                             print(f"{ticker_list} db에 데이터 삭제 및 데이터 삽입 작업....")
                             # 새로운 데이터 일괄 삽입
                             Ohlcv.objects.bulk_create(to_create_add, batch_size=1000)
-                            to_craete_add = []
-                            ticker_list = []
-                            print('저장완료')
+                        to_craete_add = []
+                        ticker_list = []
+                        print('저장완료')
             print("finished!! ")
 
           
