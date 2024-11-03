@@ -461,7 +461,7 @@ class DBUpdater:
                             print(f"{ticker_list} db에 데이터 삭제 및 데이터 삽입 작업....")
                             # 새로운 데이터 일괄 삽입
                             Ohlcv.objects.bulk_create(to_create_add, batch_size=1000)
-                        to_craete_add = []
+                        to_create_add = []
                         ticker_list = []
                         print('저장완료')
             print("finished!! ")
