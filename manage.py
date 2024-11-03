@@ -20,8 +20,8 @@ def main():
         ) from exc
     
     # 마이그레이션 실행하고 server 시작하기 
-    if not settings.DEBUG:
-        call_command('migrate')
+    #if not settings.DEBUG:
+    #    call_command('migrate')
 
     execute_from_command_line(sys.argv)
 
