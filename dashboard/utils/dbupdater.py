@@ -433,7 +433,7 @@ class DBUpdater:
             
             to_create_add = []
             ticker_list = []
-            for code, ticker_obj in exist_ticker_dict:
+            for code, ticker_obj in exist_ticker_dict.items():
                 if ticker_obj:
                     print(ticker_obj.name, "...")
                     data = fdr.DataReader(code, start=start_date)
