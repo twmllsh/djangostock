@@ -16,8 +16,7 @@ from io import StringIO
 from typing import Optional, List, Dict, Tuple, Iterable
 from pathlib import Path
 from pykrx import stock as pystock
-
-# from channels.db import database_sync_to_async
+import FinanceDataReader as fdr
 from bs4 import BeautifulSoup
 from fake_useragent import UserAgent
 from django.db import transaction
@@ -26,12 +25,9 @@ from django.db.models import Max
 from django.db import DatabaseError
 from dashboard.models import *
 from dashboard.utils.sean_func import Text_mining
-
 from .message import My_discord
+
 mydiscord = My_discord()
-
-
-import FinanceDataReader as fdr
 
 ua = UserAgent()
 
@@ -73,7 +69,7 @@ class StockFunc:
         df = df.drop(df.index[0])
         return df
 
-    def _cal_investor(df : pd.DataFrame):
+    def _cal_investor(df: pd.DataFrame):
         """
         구간데이터를 주면 정리해주는 함수. return dict
         """
@@ -210,7 +206,7 @@ class StockFunc:
 
             return temp_dic
 
-    def get_investor_part(code :str, low_dates:List):
+    def get_investor_part(code: str, low_dates: List):
         """
         애초부터 investor_ls 자료만 가져온다.
         """
@@ -288,15 +284,16 @@ class StockFunc:
 import os
 from .message import My_discord
 
+
 class DBUpdater:
 
     def update_ticker():
-        print('====================================')
-        print('update_ticker running.......')
-        print('====================================')
-        
-        asyncio.run(mydiscord.send_message(f'update_ticker start! '))
-                
+        print("====================================")
+        print("update_ticker running.......")
+        print("====================================")
+
+        asyncio.run(mydiscord.send_message(f"update_ticker start! "))
+
         datas = asyncio.run(GetData.get_code_info_df_async())
         print("데이터 다운로드 완료!")
         print("db update 중.")
@@ -339,20 +336,17 @@ class DBUpdater:
 
         print(f"updated : {len(to_update)} created : {len(to_create)}")
 
-        
-        asyncio.run(mydiscord.send_message(f'update_ticker finished!!'))
+        asyncio.run(mydiscord.send_message(f"update_ticker finished!!"))
         return datas
-        
-        
-    def ohlcv_from_backupfile_to_db(backup_file_name, backup_codes : List[str] = None):
+
+    def ohlcv_from_backupfile_to_db(backup_file_name, backup_codes: List[str] = None):
         """
         backup_codes 는 리스트, 주어지면 리스트안에 있는 code 들만 백업.
         backup_codes
         """
         if backup_codes is None:
-            backup_codes =[]
-            
-        
+            backup_codes = []
+
         # backup_file_name = "ohlcv.csv"
         fn = Path(settings.BASE_DIR) / backup_file_name
         if os.path.exists(fn):
@@ -416,30 +410,27 @@ class DBUpdater:
         print("데이터 복원완료! ")
 
     def update_ohlcv():
-        
-        
-        
-        
-        print('====================================')
-        print('update_ohlcv running.......')
-        print('====================================')
-        asyncio.run(mydiscord.send_message(f'update_ohlcv running..'))
-        
+
+        print("====================================")
+        print("update_ohlcv running.......")
+        print("====================================")
+        asyncio.run(mydiscord.send_message(f"update_ohlcv running.."))
+
         def _all_data_from_fdr():
-            ## 만약 금요일이면,  전체데이터 새로 fdr로 받기. 
+            ## 만약 금요일이면,  전체데이터 새로 fdr로 받기.
             tickers = Ticker.objects.all()
-            exist_ticker_dict = {ticker.code:ticker for ticker in tickers}
-            
-            qs = Ohlcv.objects.prefetch_related('ticker')
+            exist_ticker_dict = {ticker.code: ticker for ticker in tickers}
+
+            qs = Ohlcv.objects.prefetch_related("ticker")
             df = pd.DataFrame(qs.values())
 
-            start_date =pd.Timestamp.now().date() - pd.Timedelta(days=500)
-            
+            start_date = pd.Timestamp.now().date() - pd.Timedelta(days=500)
+
             to_create_add = []
-            for code in df['ticker_id']:
+            for code in df["ticker_id"]:
                 ticker_obj = exist_ticker_dict.get(code)
                 if ticker_obj:
-                    print(ticker_obj.name, '...')
+                    print(ticker_obj.name, "...")
                     data = fdr.DataReader(code, start=start_date)
                     if len(data):
                         for date, row in data.iterrows():
@@ -456,24 +447,24 @@ class DBUpdater:
                             to_create_add.append(ohlcv)
 
             ## 삭제 및 삽입 시작
-            print('db에 데이터 삭제 및 데이터 삽입 작업....')
+            print("db에 데이터 삭제 및 데이터 삽입 작업....")
             with transaction.atomic():
                 # 기존 데이터 삭제
                 Ohlcv.objects.filter(ticker_id=code).delete()
                 # 새로운 데이터 일괄 삽입
                 Ohlcv.objects.bulk_create(to_create_add, batch_size=1000)
-                to_craete_add= []
-            print('finished!! ')
-        
-        # 금요일이면 _all_data_from_fdr 실행하기. 
+                to_craete_add = []
+            print("finished!! ")
+
+        # 금요일이면 _all_data_from_fdr 실행하기.
         today = pd.Timestamp.now()
-        if today.weekday() ==5: # 토요일이면
-        # if today.weekday() ==4: # 0 :월 
-            print('전체 데이터 fdr 작업중.....')
+        if today.weekday() == 5:  # 토요일이면
+            # if today.weekday() ==4: # 0 :월
+            print("전체 데이터 fdr 작업중.....")
             _all_data_from_fdr()
-            
-            return 
-        
+
+            return
+
         data = Ohlcv.objects.first()
         if not data:
             print(
@@ -593,8 +584,7 @@ class DBUpdater:
                     to_create.append(ohlcv)
 
         update_fileds = ["Open", "High", "Low", "Close", "Change", "Volume", "Amount"]
-        
-        
+
         print("bulk_job start!")
         with transaction.atomic():
             # bulk_update
@@ -607,15 +597,8 @@ class DBUpdater:
                 print(f"{len(to_create)} 개 데이터 create")
 
         print("bulk_job complete!")
-        asyncio.run(mydiscord.send_message(f'update_ohlcv finished!!'))
+        asyncio.run(mydiscord.send_message(f"update_ohlcv finished!!"))
 
-
-                
-            
-            
-                    
-            
-        
         ## QuerySet Hint
 
         #### 코드 날짜로 데이터 가져오기
@@ -635,16 +618,14 @@ class DBUpdater:
         # the_date= pd.Timestamp().now().date()
         # the_data = Ohlcv.objects.filter(date='2024-09-27').select_related('ticker')
 
-    
-    def update_basic_info(test_cnt : int = None, update_codes = None):
-        
-        
-        print('====================================')
-        print('update_basic_info running.......')
-        print('====================================')
+    def update_basic_info(test_cnt: int = None, update_codes=None):
+
+        print("====================================")
+        print("update_basic_info running.......")
+        print("====================================")
         # test_cnt = 100
-        
-        asyncio.run(mydiscord.send_message(f'update_basic_info running......'))
+
+        asyncio.run(mydiscord.send_message(f"update_basic_info running......"))
         if update_codes is None:
             update_codes = []
         ticker_qs = Ticker.objects.values_list("code", "name")
@@ -829,7 +810,7 @@ class DBUpdater:
                                 to_update_fin.append(fin)
                                 for field, old_value in changes.items():
                                     if isinstance(old_value, (int, float)):
-                                        gb= f"{year}{quarter}"
+                                        gb = f"{year}{quarter}"
                                         changedlog_model = ChangeLog(
                                             ticker=ticker,
                                             change_field=field,
@@ -896,13 +877,13 @@ class DBUpdater:
                 print("changedlog_models bulk_create succeed!! ")
 
         print("bulk_job complete!")
-        asyncio.run(mydiscord.send_message(f'update_basic_info finished......'))
-      
-    def investor_from_file_to_db(backupfile, update_codes:List[str]=None):
+        asyncio.run(mydiscord.send_message(f"update_basic_info finished......"))
+
+    def investor_from_file_to_db(backupfile, update_codes: List[str] = None):
 
         if update_codes is None:
-            update_codes=[]
-        
+            update_codes = []
+
         def csv_data_generator(file_path):
             with open(file_path, mode="r", encoding="utf-8") as file:
                 reader = csv.DictReader(file)
@@ -980,10 +961,11 @@ class DBUpdater:
             print("데이터 복원완료!")
 
     def update_investor():
-        
-        print('====================================')
-        print('update_investor running.......')
-        print('====================================')          
+
+        print("====================================")
+        print("update_investor running.......")
+        print("====================================")
+
         def csv_data_generator(file_path):
             with open(file_path, mode="r", encoding="utf-8") as file:
                 reader = csv.DictReader(file)
@@ -1049,8 +1031,8 @@ class DBUpdater:
                 InvestorTrading.objects.bulk_create(to_create_investor)
                 to_create_investor = []
 
-        asyncio.run(mydiscord.send_message(f'update_investor start!......'))
-        
+        asyncio.run(mydiscord.send_message(f"update_investor start!......"))
+
         data = InvestorTrading.objects.last()
         if not data:
             print(
@@ -1062,8 +1044,8 @@ class DBUpdater:
                 data_gen = csv_data_generator(backup_file_name)
                 records_to_db(data_gen)
                 print("데이터 복원완료!")
-            return 
-        
+            return
+
         # update 하기
         latest_dates = (
             InvestorTrading.objects.values("ticker_id")
@@ -1084,21 +1066,20 @@ class DBUpdater:
             str_dates = [date.strftime("%Y%m%d") for date in dates]
             result = asyncio.run(GetData._get_investor_all_async(str_dates))
             dates_downloaded = result["날짜"].unique()
-            
+
             records = result.to_dict("records")
             print(f"dates downloaded {dates_downloaded}")
             # 저장하기.
             records_to_db(records=records)
-        
+
         # ## 최종적으로 특정날짜 이전 데이터 제거하기.
         n = 365 * 2
         the_date = pd.Timestamp.now().date() - pd.Timedelta(days=n)
         qs = InvestorTrading.objects.filter(날짜__lt=the_date)
         # Ohlcv.objects.filter(date__lt=the_date).delete()
 
-        asyncio.run(mydiscord.send_message(f'update_investor finished......'))
-        
-        
+        asyncio.run(mydiscord.send_message(f"update_investor finished......"))
+
         #### 코드 날짜로 데이터 가져오기
         # col = ['date','open','high','low','close','volume']
         # data = Ohlcv.objects.select_related('ticker').filter(
@@ -1116,11 +1097,11 @@ class DBUpdater:
         date_cnt=1 그날 데이터만 취급
         가져온 데이터의 맨 위. 가장 최근일.
         """
-        asyncio.run(mydiscord.send_message(f'update_issue start......'))
-        print('====================================')
-        print('update_issue running.......')
-        print('====================================')
-        
+        asyncio.run(mydiscord.send_message(f"update_issue start......"))
+        print("====================================")
+        print("update_issue running.......")
+        print("====================================")
+
         iss_df = GetData.get_iss_list()  # 전체 데이터 받기.
 
         valid_dates = iss_df["regdate"].unique()[
@@ -1142,7 +1123,7 @@ class DBUpdater:
         )
         duplicate_urls = set(existing_hl_str) & set(new_text)
         new_unique_urls = set(new_text) - duplicate_urls
-        
+
         new_dict_list = [
             item for item in latest_dict_list if item["hl_str"] in new_unique_urls
         ]
@@ -1167,12 +1148,12 @@ class DBUpdater:
             related = dic.pop("ralated_codes", [])
             # iss = Iss(**dic)
             iss = Iss(
-                issn=dic['issn'],
-                hl_str= dic["hl_str"],
-                regdate= dic["regdate"],                
-                ralated_code_names= dic["ralated_code_names"],
-                hl_cont_text= dic["hl_cont_text"],
-                hl_cont_url= dic["hl_cont_url"],
+                issn=dic["issn"],
+                hl_str=dic["hl_str"],
+                regdate=dic["regdate"],
+                ralated_code_names=dic["ralated_code_names"],
+                hl_cont_text=dic["hl_cont_text"],
+                hl_cont_url=dic["hl_cont_url"],
             )
             try:
                 iss.save()
@@ -1180,7 +1161,7 @@ class DBUpdater:
                 if related:
                     # filter 로 ticker object 가져오기
                     iss.tickers.set(related)
-                    print('tickers set ok!')
+                    print("tickers set ok!")
                     # tickers = Ticker.objects.filter(code__in=related)
                     # if len(tickers):
                     #     for ticker in tickers:
@@ -1188,17 +1169,17 @@ class DBUpdater:
                     #         iss.tickers.add(tickers)  ## 새로운이슈니까 그냥 add 나 셋하면 됨.
             except Exception as e:
                 print(e, dic)
-        asyncio.run(mydiscord.send_message(f'update_issue finished......'))
+        asyncio.run(mydiscord.send_message(f"update_issue finished......"))
         return latest_dict_list
 
     def update_theme_upjong():
         """
         데이터 가져와서 저장하기.
         """
-        asyncio.run(mydiscord.send_message(f'update_upjong start......'))
-        print('====================================')
-        print('update_theme_upjong running.......')
-        print('====================================')
+        asyncio.run(mydiscord.send_message(f"update_upjong start......"))
+        print("====================================")
+        print("update_theme_upjong running.......")
+        print("====================================")
         ## 실제데이터 다운로드
         theme_data, upjong_data = asyncio.run(GetData.get_all_upjong_theme())
 
@@ -1339,13 +1320,14 @@ class DBUpdater:
                 print(f"{remove_obj_set} 추가")
                 print("=========================================")
                 upjong.tickers.set(upjong_code_obj_set)
-        asyncio.run(mydiscord.send_message(f'update_issue finished......'))
+        asyncio.run(mydiscord.send_message(f"update_issue finished......"))
+
     def update_stockplus_news():
-        
-        print('====================================')
-        print('update_stockplus running.......')
-        print('====================================')
-        asyncio.run(mydiscord.send_message(f'update_stockplus_news start......'))
+
+        print("====================================")
+        print("update_stockplus running.......")
+        print("====================================")
+        asyncio.run(mydiscord.send_message(f"update_stockplus_news start......"))
         datas = asyncio.run(GetData._get_news_from_stockplus_today())
 
         ## test
@@ -1375,19 +1357,19 @@ class DBUpdater:
                 try:
                     to_create.append(news)
                     news.save()  # 저장 후
-                    print('save succeed!')
+                    print("save succeed!")
                 except Exception as e:
                     print(e, data)
-                    
-                try:        
+
+                try:
                     if data["relatedStocks"]:
                         news.tickers.set(data["relatedStocks"])
-                        print('related code setting !')
+                        print("related code setting !")
                 except Exception as e:
                     print(e, data["relatedStocks"])
-                    
+
         print(f"{len(datas)} 개 중 {len(to_create)} 개 데이터 저장!")
-        asyncio.run(mydiscord.send_message(f'update_stockplus_news finished......'))
+        asyncio.run(mydiscord.send_message(f"update_stockplus_news finished......"))
         ## to_create 자료가지고 데이터 만들어 메세지 보내기
 
 
@@ -1470,11 +1452,9 @@ class GetData:
     def _get_info_all(code_list: List[Tuple], temp_cnt=None) -> List[Dict]:
         code_list = list(code_list)
         return asyncio.run(GetData._get_info_all_async(code_list))
-    
+
     async def _get_info_all_async(code_list: List[Tuple], temp_cnt=None) -> List[Dict]:
-        """
-        
-        """
+        """ """
 
         async def fetch_with_semaphore(
             code, name, semaphore: asyncio.Semaphore, session: aiohttp.ClientSession
@@ -1503,7 +1483,7 @@ class GetData:
                 )
 
             responses = await asyncio.gather(*tasks)
-            
+
             return responses
 
     async def _get_info_async(
@@ -1542,8 +1522,6 @@ class GetData:
 
         return dic, traderinfo, finstats
 
-    
-    
     async def _get_naver_info_async(
         code: str,
         name: str,
@@ -1694,9 +1672,7 @@ class GetData:
         return all_dic
 
     async def _get_fnguide_info_async(
-        code: str,
-        name: str,
-        session: aiohttp.ClientSession = None
+        code: str, name: str, session: aiohttp.ClientSession = None
     ):
         """
         return : dict
@@ -2258,8 +2234,6 @@ class GetData:
 
         return df.to_dict("records")
 
-
-
     def get_ohlcv_min(code, data_type, limit=480):
         option_dic = {
             "월봉": "months",
@@ -2274,7 +2248,10 @@ class GetData:
         str_option = option_dic[data_type]
         url = f"http://finance.daum.net/api/charts/{acode}/{str_option}"
         params = {"limit": f"{limit}", "adjusted": "true"}
-        headers = {"referer": "https://finance.daum.net/chart/", "user-agent": "Mozilla/5.0"}
+        headers = {
+            "referer": "https://finance.daum.net/chart/",
+            "user-agent": "Mozilla/5.0",
+        }
 
         # async with aiohttp.ClientSession() as session:
         #     async with session.get(url=url, headers=headers, params=params) as response:
@@ -2288,7 +2265,7 @@ class GetData:
             data = data.json()
         else:
             return pd.DataFrame()
-        
+
         data = data["data"]
         df = pd.DataFrame(data)
         chage_col = {
@@ -2305,7 +2282,6 @@ class GetData:
         df.rename(columns=chage_col, inplace=True)
         df = df[columns].set_index("Date")
         return df
-
 
 
 if __name__ == "__main__":
