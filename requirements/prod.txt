@@ -1,6 +1,6 @@
 -r common.txt
 numpy==1.24  # 적절한 numpy 버전
-TA-Lib
+TA-Lib==0.4.32
 asgiref==3.8.1
 dj-database-url==2.2.0
 Django==5.1.1
@@ -11,12 +11,12 @@ pandas==2.2.3
 yfinance==0.2.44
 pandas-ta==0.3.14b0
 # environ
-pymysql
+pymysql==1.1.1
 fake-useragent==0.1.13
-finance-datareader
-plotly
+finance-datareader==0.9.94
+plotly==5.24.1
 discord.py==2.4.0
 python-telegram-bot==21.6
 django-apscheduler==0.7.0
-django-environ
+django-environ==0.11.2
 django-bootstrap5==24.3
