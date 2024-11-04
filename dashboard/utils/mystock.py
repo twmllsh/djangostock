@@ -8,6 +8,14 @@ from dashboard import models
 from dashboard.models import InvestorTrading
 
 
+from bokeh.models import ColumnDataSource, Range1d
+from bokeh.models import RangeTool,HoverTool,Span,DataRange1d,CustomJS
+from bokeh.plotting import figure, show
+from bokeh.models.formatters import NumeralTickFormatter
+from bokeh.layouts import gridplot, column, row
+from bokeh.models import FactorRange, LabelSet
+
+
 class GetData:
 
     def _get_ohlcv_from_daum(code, data_type="30분봉", limit=450):
@@ -364,63 +372,259 @@ class Stock:
     def is_5w(self):
         pass
 
+
     def plot(self, option="day"):
-
-        from bokeh.models import ColumnDataSource, Range1d
-        from bokeh.plotting import figure, show
-        from bokeh.models.formatters import NumeralTickFormatter
-        from bokeh.layouts import gridplot, column, row
-
         if option == "day":
             chart = getattr(self, "chart_d")
 
-        ## df 변환.
-
-        # df = pd.DataFrame(MSFT)[-240:]
-
-        df: pd.DataFrame = chart.df.reset_index()
+        df: pd.DataFrame = chart.df
         df.columns = [col.lower() for col in df.columns]
-        df["date"] = pd.to_datetime(df["date"])
 
-        inc = df.close > df.open
-        dec = df.open > df.close
 
-        source = ColumnDataSource(
-            data=dict(
-                date=df.date,
-                open=df.open,
-                close=df.close,
-                high=df.high,
-                low=df.low,
-                volume=df.volume,
-            )
+        ## ma 데이터 생성 ##################################################
+        arr_ma = np.array([3, 20, 60, 120, 240])
+        # arr_ma = np.array([10, 20, 60, 120, 240])
+        color = ["black", "red", "blue", "green", "gray"]
+        width = [1, 2, 3, 3, 3]
+        alpha = [0.7, 0.7, 0.6, 0.6, 0.6 ]
+
+        mas = arr_ma[arr_ma < len(df)]
+        colors = color[:len(mas)]
+        widths = width[:len(mas)]
+        alphas = alpha[:len(mas)]
+
+        for ma in mas:
+            df[f"ma{ma}"] = getattr(chart, f"ma{ma}").data
+
+        if hasattr(chart.bb240, "upper"):
+            df["upper"] = chart.bb240.upper
+            df["lower"] = chart.bb240.lower
+            df["bb240_width"] = chart.bb240.two_line.width
+                    
+        if hasattr(chart.bb60, "upper"):
+            df["upper60"] = chart.bb60.upper
+            df["lower60"] = chart.bb60.lower
+            df["bb60_width"] = chart.bb60.two_line.width
+            
+        if hasattr(chart.sun, "line_max"):
+            df["sun_max"] = chart.sun.line_max.data
+            df["sun_min"] = chart.sun.line_min.data
+            df["sun_width"] = chart.sun.two_line.width
+
+        df["candle_color"] = [
+            "#f4292f" if row["open"] <= row["close"] else "#2a79e2"
+            for _, row in df.iterrows()
+        ]
+
+        ## vol20ma
+        if hasattr(chart.vol, "ma_vol"):
+            df["vol20ma"] = chart.vol.ma_vol
+
+        유동주식수 = self.유동주식수
+        상장주식수 = self.상장주식수
+        print("유동주식수", 유동주식수)
+        print("상장주식수", 상장주식수)
+
+        ## 거래량 color 지정 임시!
+        ac_cond = df["volume"] > df["volume"].shift(1) * 2
+        df["vol_color"] = ["#f4292f" if bl else "#808080" for bl in ac_cond]
+
+        low_cond = df["volume"] < df["vol20ma"]  # 평균보다 작은조건
+        df["vol_color"] = [
+            "blue" if bl else value for value, bl in zip(df["vol_color"], low_cond)
+        ]
+
+        if 유동주식수:
+            cond_유통주식수 = df["volume"] >= 유동주식수
+            if sum(cond_유통주식수):
+                print("1")
+                df["vol_color"] = [
+                    "#ffff00" if bl else value
+                    for value, bl in zip(df["vol_color"], cond_유통주식수)
+                ]
+
+        if 상장주식수:
+            cond_상장주식수 = df["volume"] >= 상장주식수
+            if sum(cond_상장주식수):
+                print("2")
+                df["vol_color"] = [
+                    "#800080" if bl else value
+                    for value, bl in zip(df["vol_color"], cond_상장주식수)
+                ]
+
+        df = df.reset_index()
+        # df["Date"] = pd.to_datetime(df["date"])
+        df['Date'] = df['Date'].dt.strftime('%Y-%m-%d')
+        # df = df.set_index('date_str')
+        source = ColumnDataSource(df)
+        
+        
+        if len(self.investor_part):
+            invest_df = pd.DataFrame(self.investor_part)
+            invest_df.set_index('start',inplace=True)
+            invest_df['ma3']= chart.ma3.data
+            invest_df.reset_index(inplace=True)
+            invest_df['start'] = invest_df['start'].dt.strftime('%Y-%m-%d')
+            invest_df['end'] = invest_df['end'].dt.strftime('%Y-%m-%d')
+            invest_df['text'] = '주도기관: ' + invest_df['주도기관'] + '\n' + \
+            '순매수금(억): ' + invest_df['순매수금_억'].map(lambda x: f"{x:.1f}") + '\n' +  \
+            '매집비: ' + invest_df['매집비'].map(lambda x: f"{x:.1f}%") + '\n' +  \
+            '풀매수기관: ' + invest_df['풀매수기관'] + '\n' 
+            
+            source_investor = ColumnDataSource(invest_df)
+        
+        
+        ## p1 그리기 ################################################################
+        TOOLS = "pan, zoom_in, zoom_out,wheel_zoom,box_zoom,reset,save"
+        title = f"{self.ticker.name}({self.ticker.code})"  ## 타이틀 지정해야함. ....
+
+        plot_option = dict(
+            width=800,
+            height=300,
+            background_fill_color="#ffffff",
+            x_range=FactorRange(*df['Date']),
         )
-
-        TOOLS = "pan,wheel_zoom,box_zoom,reset,save"
-
-        title = f"{self.ticker.name}({self.ticker.code})"
 
         p1 = figure(
             tools=TOOLS,
-            width=800,
-            height=300,
+            **plot_option,
             # toolbar_location=None,
             title=title,
-            background_fill_color="#ffffff",
-            # x_range=Range1d(df.index[-40],df.index[-1] + 5),
-            # y_range=Range1d(0,20),
+            )
+
+        ## sun 
+        p1.varea(
+            x='Date',
+            y1='sun_max',
+            y2='sun_min',
+            color="#bfd8f6",
+            alpha=0.5,
+            source=source,
+            # legend_label="mesh",
         )
+
+        ## 캔들차트 그리기
+        p1.segment(
+            "Date",
+            "high",
+            "Date",
+            "low",
+            color="candle_color",
+            source=source,
+        )
+        p1.vbar(
+            "Date",
+            0.6,
+            "open",
+            "close",
+            color="candle_color",
+            line_width=0,
+            source=source,
+        )
+
+        multi_line = [getattr(chart, f"ma{ma}").data.to_list() for ma in mas]
+        xs = [df.index.to_list()] * len(multi_line)
+
+        p1.multi_line(xs=xs, ys=multi_line, color=colors, alpha=alphas, line_width=widths)
+
+        for item in ['upper', 'lower']:
+            for bb in ['bb240', 'bb60']:
+                bb_obj = getattr(chart, bb)
+                if hasattr(bb_obj, item):
+                    colname = f"{item}60" if bb=="bb60" else item
+                    color = "#e7effc" if bb=="bb60" else "#f6b2b1"
+                    
+                    p1.line(
+                    x="Date",
+                    y=f"{colname}",
+                    color=color,
+                    alpha=0.8,
+                    line_width=2,
+                    source=source,
+                    )
+                    
+        ## label 넣기
+        if len(self.investor_part):
+            labels = LabelSet(x='start', y='ma3', text='text', source=source_investor,
+                              background_fill_alpha=0.3,  # 배경 투명도 설정
+                              background_fill_color='gray',
+                              text_font_size="3pt",  # 텍스트 크기 지정
+                              text_color="navy", 
+                              text_align="left", 
+                              x_offset=-30, y_offset=-30) ## 덱스트박스 위치맞추기기 어려움. 
+            p1.add_layout(labels)
+            
+            # 점 그리기
+            p1.scatter('start', 'ma3', size=10, source=source_investor)
+        
+        
+        
+        
+        
+                    
+        ## p2 거래량차트 그리기 ################################################33
+        plot_option["height"] = 120
+        p2 = figure(
+            **plot_option,
+            toolbar_location=None,
+        )  # x_range를 공유해서 차트가 일치하게 만듦
+
+        p2.vbar(
+            x="Date",
+            top="volume",
+            width=0.7,
+            fill_color="vol_color",
+            line_width=0,
+            source=source,
+        )
+        ## 평균거래량
+        p2.line(
+            x="Date",
+            y="vol20ma",
+            line_width=1,
+            line_color="black",
+            source=source,
+        )
+
+        # ## 주석 (유통주식수, 상장주식수) Line
+        if 유동주식수:
+            p2_유통주식수 = Span(
+                location=유동주식수,
+                dimension="width",
+                line_color="#9932cc",
+                line_width=1,
+            )
+            p2.add_layout(p2_유통주식수)
+        if 상장주식수:
+            p2_상장주식수 = Span(
+                location=상장주식수,
+                dimension="width",
+                line_color="#8b008b",
+                line_width=1,
+            )
+            p2.add_layout(p2_상장주식수)        
+        
+        # range bar 그리기 ########################################################
+        plot_option["height"] = 60
+        range_bar = figure(
+            **plot_option,
+            # background_fill_color="#efefef",
+            toolbar_location=None,
+            y_axis_type=None,
+        )
+
+        range_tool = RangeTool(x_range=p1.x_range, start_gesture="pan")
+        range_tool.overlay.fill_color = "navy"
+        range_tool.overlay.fill_alpha = 0.2
+
+        range_bar.line("Date", "close", source=source)
+        range_bar.ygrid.grid_line_color = None
+        range_bar.add_tools(range_tool)        
+        
+        ## 그외 레이아웃 설정 및 호버 설정 #################################################
         p1.xaxis.major_label_orientation = 0.8  # radians
         p1.x_range.range_padding = 0.05
-
-        # map dataframe indices to date strings and use as label overrides
-        x_lable_overrides = {
-            i: date.strftime("%y-%m-%d") for i, date in zip(df.index, df["date"])
-        }
-        p1.xaxis.major_label_overrides = x_lable_overrides
-
-        # one tick per week (5 weekdays)
-        p1.xaxis.ticker = list(range(df.index[0], df.index[-1], 10))
+        # p1.xaxis.ticker = list(range(df.index[0], df.index[-1], 10))
         p1.xaxis.axis_label = "Date"
         p1.yaxis.axis_label = "Price"
 
@@ -431,105 +635,13 @@ class Stock:
         # 축라벨 포멧팅
         p1.yaxis.formatter = NumeralTickFormatter(format="0,0")
 
-        ## 캔들차트 그리기
-        p1.segment(
-            df.index[dec],
-            df.loc[dec, "high"],
-            df.index[dec],
-            df.loc[dec, "low"],
-            color="#2a79e2",
-        )
-        p1.segment(
-            df.index[inc],
-            df.loc[inc, "high"],
-            df.index[inc],
-            df.loc[inc, "low"],
-            color="#f4292f",
-        )
-
-        p1.vbar(
-            df.index[dec],
-            0.6,
-            df.open[dec],
-            df.close[dec],
-            color="#2a79e2",
-            line_width=0,
-        )
-        p1.vbar(
-            df.index[inc],
-            0.6,
-            df.open[inc],
-            df.close[inc],
-            fill_color="#f4292f",
-            line_width=0,
-        )
-
-        ## 이동평균선 그리기
-        mas = [3, 20, 60]
-        color = ["blue", "red", "green"]
-        width = [1, 2, 3]
-        alpha = [0.7, 0.7, 0.6]
-
-        multi_line = [getattr(chart, f"ma{ma}").data.to_list() for ma in mas]
-        xs = [df.index.to_list()] * len(multi_line)
-
-        p1.multi_line(xs=xs, ys=multi_line, color=color, alpha=alpha, line_width=width)
-
-        ## BB
-        # ma60 = df.close.rolling(60).mean()
-        # std60 = df.close.rolling(60).std()
-        # upper = ma60 + 2 * std60
-        # lower = ma60 - 2 * std60
-        for bb in ["bb60", "bb240"]:
-            if hasattr(chart, bb):
-                bb_object = getattr(chart, bb)
-                upper, lower = bb_object.upper, bb_object.lower
-                p1.multi_line(
-                    xs=[upper.index, lower.index],
-                    ys=[upper, lower],
-                    color="#f6b2b1",
-                    alpha=0.8,
-                    line_width=2,
-                    legend_label="BB",
-                )
-
-        ## sun
-        # ma20 = df.close.rolling(20).mean()
-        # std20 = df.close.rolling(20).std()
-        # sun_max = ma20 + 2 * std20
-        # sun_low = ma20 - 2 * std20
-        if hasattr(chart, "sun"):
-            sun_object = getattr(chart, "sun")
-            sun_max, sun_min = sun_object.line_max.data, sun_object.line_min.data
-            p1.varea(
-                x=sun_max.reset_index().index,
-                y1=sun_max,
-                y2=sun_min,
-                color="#bfd8f6",
-                alpha=0.5,
-                legend_label="mesh",
-            )
-
-        # # 거래량 차트 그리기
-        p2 = figure(
-            width=800, height=150, x_range=p1.x_range, toolbar_location=None
-        )  # x_range를 공유해서 차트가 일치하게 만듦
-        p2.vbar(
-            x=df.index[dec],
-            top=df.volume[dec],
-            width=0.7,
-            fill_color="#2a79e2",
-            line_width=0,
-        )
-        p2.vbar(
-            x=df.index[inc],
-            top=df.volume[inc],
-            width=0.7,
-            fill_color="#f4292f",
-            line_width=0,
-        )
         # p2.vbar(x=df.index, top=df.volume,  fill_color="#B3DE69", )
+        # 30칸마다 라벨 표시
+        x_lable_overrides = {
+                    i: date for i, date in enumerate(df['Date']) if i % 30 == 0
+                }
 
+        # p1.xaxis.major_label_overrides = x_lable_overrides
         p2.xaxis.major_label_overrides = x_lable_overrides
         p2.x_range.range_padding = 0.05
         p2.xaxis.axis_label = "Date"
@@ -538,10 +650,76 @@ class Stock:
         ## 그리드 설정
         p2.xgrid.grid_line_color = None
         p2.ygrid.grid_line_alpha = 0.5
-
+        p1.xaxis.ticker = []  # This removes the tick marks
+        p2.xaxis.ticker = []  # This removes the tick marks
+        p1.xaxis.axis_label = None  # This removes the x-axis label
+        p2.xaxis.axis_label = None  # This removes the x-axis label
         ## 주석 (유통주식수, 상장주식수)
 
-        layout = column(p1, p2, sizing_mode="stretch_both")
+
+
+        # 그래프간 공백제거
+        p1.min_border_bottom = 0
+        p2.min_border_top = 0
+
+        ## 거래량 최소값부터 보이기
+        p2.y_range.start = source.data["volume"].min() / 2
+        p2.y_range = DataRange1d()  # Y축을 DataRange1d로 설정하여 동적 범위 설정
+
+
+        # HoverTool 추가 data source 에서 값갖온다.
+        hover = HoverTool()
+        hover.tooltips = [
+            ("Date:", "@Date{%F}"),
+            ("open", "@open{0,0}"),
+            ("high", "@high{0,0}"),
+            ("low", "@low{0,0}"),
+            ("close", "@close{0,0}"),
+            ("volume", "@volume{0,0}"),
+            ("volma20", "@vol20ma{0,0}"),
+            ("upper240", "@upper{0,0}"),
+            ("lower240", "@lower{0,0}"),
+            ("bb240_width", "@bb240_width{0,0}"),
+            ("upper60", "@upper60{0,0}"),
+            ("lower60", "@lower60{0,0}"),
+            ("bb60_width", "@bb60_width{0,0}"),
+            ("mesh_width", "@sun_width{0,0}"),
+            
+        ]  # 툴팁 설정
+        hover.formatters = {"@Date": "datetime"}  # '@date' 열을 datetime으로 처리
+        # HoverTool 스타일 설정 필요 ( 투명도 )
+        # hover.renderers = 
+        p1.add_tools(hover)
+        p2.add_tools(hover)
+
+
+        # 축 범위 업데이트를 위한 CustomJS 콜백
+        callback = CustomJS(args=dict(source=source, y_range=p2.y_range), code="""
+            const data = source.data;
+            const start = cb_obj.start;
+            const end = cb_obj.end;
+            const y_values = data['volume'];
+            const x_values = data.index;
+            let min_y = Infinity;
+            let max_y = -Infinity;
+
+            for (let i = 0; i < x_values.length; i++) {
+                if (x_values[i] >= start && x_values[i] <= end) {
+                    min_y = Math.min(min_y, y_values[i]);
+                    max_y = Math.max(max_y, y_values[i]);
+                }
+            }
+            y_range.start = min_y - 1; // 작은 여유 추가
+            y_range.end = max_y + 1; // 작은 여유 추가
+        """)
+
+        # x축이 변경될 때 콜백 트리거 설정
+        p2.x_range.js_on_change('start', callback)
+        p2.x_range.js_on_change('end', callback)        
+        
+        ## merge graph
+        layout = column(p1, p2, range_bar, sizing_mode="stretch_both")
+        
         return layout
 
     def __repr__(self):
