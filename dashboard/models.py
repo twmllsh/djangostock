@@ -3,6 +3,7 @@ from django.db import models
 from model_utils import FieldTracker
 from django.db.models import F, Subquery, OuterRef, Q, Sum, Count
 from django.db import transaction
+from dashboard.utils.mystock import ElseInfo
 
 class Ticker(models.Model):
     code = models.CharField(max_length=10, primary_key=True)
@@ -80,7 +81,7 @@ class Ohlcv(models.Model):
         verbose_name='OHLCV'
         # db_table = 'stock_dashboard_ohlcv'
         
-    def get_data(ticker:Ticker):
+    def get_data_xx(ticker:Ticker):
         ## 240 개만 데이터 가져오기. 
         field_names = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume', 'Amount', 'Change']
         qs = Ohlcv.objects.filter(ticker=ticker)
@@ -92,7 +93,7 @@ class Ohlcv(models.Model):
         return df
     
     @classmethod
-    def get_data1(cls, ticker:Ticker):
+    def get_data(cls, ticker:Ticker):
         """특정 ticker ohlcv 데이터 가져오기"""
         qs = cls.objects.filter(ticker=ticker)
         field_names = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume', 'Amount', 'Change']
@@ -156,9 +157,10 @@ class Finstats(models.Model):
     # 실적주만 가져오기. 
     @classmethod
     def get_good_consen(cls, pct=0.3):
-        pass
+        c_year, f_yaer = ElseInfo.check_y_current
+        
         data = Finstats.objects.filter(
-            year=2024,
+            year=f_yaer,
             fintype='연결연도',
             quarter=0,
             영업이익__gt=0  # 2024년 영업이익은 양수
@@ -167,7 +169,7 @@ class Finstats(models.Model):
                 Finstats.objects.filter(
                     ticker=OuterRef('ticker'),
                     fintype='연결연도',
-                    year=2023,
+                    year=c_year,
                     quarter=0
                 ).values('영업이익')[:1]
             )

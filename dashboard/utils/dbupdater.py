@@ -410,8 +410,8 @@ class DBUpdater:
 
         print("데이터 복원완료! ")
 
-    def update_ohlcv():
-
+    def update_ohlcv(장중=None, codes:list = None):
+        ''' option : , codes : '''
         print("====================================")
         print("update_ohlcv running.......")
         print("====================================")
@@ -423,7 +423,7 @@ class DBUpdater:
             exist_ticker_dict = {ticker.code: ticker for ticker in tickers}
 
             
-            start_date = pd.Timestamp.now().date() - pd.Timedelta(days=750)
+            start_date = pd.Timestamp.now().date() - pd.Timedelta(days=600)
 
             ## 데이터 모두 먼저 지우기
             Ohlcv.objects.all().delete()
@@ -466,15 +466,12 @@ class DBUpdater:
                     print('저장완료')
             print("finished!! ")
 
-          
-
         # 금요일이면 _all_data_from_fdr 실행하기.
         today = pd.Timestamp.now()
         if today.weekday() == 6:  # 토요일이면
             # if today.weekday() ==4: # 0 :월
             print("전체 데이터 fdr 작업중.....")
             _all_data_from_fdr()
-
             return
 
         data = Ohlcv.objects.first()
@@ -531,15 +528,43 @@ class DBUpdater:
         )  ## ohlcv존재하는지 아닌지 확인할때 사용하기.
         str_dates = [date.strftime("%Y%m%d") for date in dates]
         print(f"{str_dates} data downlaod....!")
-        # 순환하면 데이터 가져오기.
-        all_ls = [GetData.get_ohlcv_all_market(date) for date in str_dates]
-        print(f"{str_dates} data downlaod complete! !")
-        concat_df = pd.concat(all_ls)
+        
+        if (codes is not None) and (len(codes) <= 100):
+            temp_today = pd.Timestamp.now().strftime('%Y-%m-%d')
+            if not Ohlcv.objects.filter(Date__in=[temp_today]).exists(): ## 오늘날짜 없으면 전체 먼저 업데이트!
+                DBUpdater.update_ohlcv() 
+            ################### fdr 방식. ########################################
+            print('fdr async 작동!')
+            semaphore = asyncio.Semaphore(5) 
+            async def async_fdr_datareader(semaphore, code, start_date):
+                async with semaphore:
+                    result = await asyncio.to_thread(fdr.DataReader, code, start_date)
+                    result['code'] = code
+                    return result
+            async def async_fdr_datareader_all(semaphore, codes, start_date):
+                tasks = [asyncio.create_task(async_fdr_datareader(semaphore, code, start_date)) for code in codes]
+                results = await asyncio.gather(*tasks)
+                df = pd.concat(results)
+                df.reset_index(inplace=True)
+                return df
+            concat_df = asyncio.run(async_fdr_datareader_all(semaphore, codes, str_dates[0]))  ## 장중에만 업데이트 해야함. 
+            
+            
+        else:
+            ########################### pystock #####################
+            # 순환하면 데이터 가져오기.
+            all_ls = [GetData.get_ohlcv_all_market(date) for date in str_dates]
+            print(f"{str_dates} data downlaod complete! !")
+            concat_df = pd.concat(all_ls)
 
         ## 새로받은데이터의 code 와 Date 정보 가져오기
         ticker_codes = concat_df["code"].unique()
         dates = concat_df["Date"].unique()
-
+    
+        
+        
+        ###########################################################################
+        
         ## 기존 데이터에 존재하는 ohlcv객체 검색
         existing_ohlcv = Ohlcv.objects.filter(
             ticker__code__in=ticker_codes,
@@ -575,8 +600,11 @@ class DBUpdater:
                     ohlcv.Low = row["Low"]
                     ohlcv.Close = row["Close"]
                     ohlcv.Volume = row["Volume"]
-                    ohlcv.Amount = row["Amount"]
-                    ohlcv.Change = row["Change"]
+                    
+                    if 'Change' in concat_df.columns:
+                        ohlcv.Change = row["Change"]
+                    if 'Amount' in concat_df.columns:
+                        ohlcv.Amount = row["Amount"]
 
                     to_update.append(ohlcv)
 
@@ -591,11 +619,15 @@ class DBUpdater:
                         Close=row["Close"],
                         Volume=row["Volume"],
                         Change=row["Change"],
-                        Amount=row["Amount"],
                     )
+                    if 'Amount' in concat_df.columns:
+                        ohlcv.Amount = row["Amount"] 
                     to_create.append(ohlcv)
 
-        update_fileds = ["Open", "High", "Low", "Close", "Change", "Volume", "Amount"]
+        
+        update_fileds = ["Open", "High", "Low", "Close", "Change", "Volume"]
+        if 'Amount' in concat_df.columns:
+            update_fileds += ['Amount']
 
         print("bulk_job start!")
         with transaction.atomic():
@@ -629,7 +661,8 @@ class DBUpdater:
         #### 특정일 (오늘) 양봉데이터만 받기.
         # the_date= pd.Timestamp().now().date()
         # the_data = Ohlcv.objects.filter(date='2024-09-27').select_related('ticker')
-
+        return concat_df
+    
     def update_basic_info(test_cnt: int = None, update_codes=None):
 
         print("====================================")
@@ -1384,6 +1417,31 @@ class DBUpdater:
         asyncio.run(mydiscord.send_message(f"update_stockplus_news finished......"))
         ## to_create 자료가지고 데이터 만들어 메세지 보내기
 
+    def anal_all_stock():
+        
+        # option 장중: 장후:
+        
+        # 장중에서는 어떻게든 codes list 만들어서 전달. 
+        ## 1. 어제분석한 내용 바탕. ( fdr 실시간 데이터.)
+        ## 2. 오늘 등락율 바탕. (pystock 지연데이터 )
+        ## 3. 조건검색 바탕. (kis 필요)
+        # update ohlcv 하고. 
+        
+        # Stock 객체 만들고. 
+        
+        # 특정 값들 추출하고. 
+        
+        ## model 로 객체 만들고.  날짜 포함. 
+        
+        # model update 하고. 
+        
+        ## 특정 조건 맞는거 찾아보고 . 
+        
+        ## 옵션에 따라 메세지 보내고. 
+        
+        
+        pass
+    
 
 class GetData:
 
@@ -1759,7 +1817,7 @@ class GetData:
             x = x.dropna(axis=1, how="all")
             # x = x.fillna(value=None)  ## nan 값을 None으로 ( 데이터베이스 저장시 필요함.)
             # x = x.where(pd.notna(x), None)
-
+            x = x.loc[:, ~x.columns.duplicated(keep='last')]  ## 2023/06 과 2023/12 의 데이터 있을때 연도경우 2023 데이터가 2개 생성되서 중복있다면 마지막데이터만 남기기. 
             for col in x.columns:
                 x[col] = pd.to_numeric(x[col], errors="coerce")
 
@@ -2205,6 +2263,27 @@ class GetData:
         except Exception as e:
             return pd.DataFrame()
 
+    def get_ohlcv_all_market_from_fdr(codes):
+        
+        semaphore = asyncio.Semaphore(5) 
+        async def async_fdr_datareader(semaphore, code, today):
+            async with semaphore:
+                result = await asyncio.to_thread(fdr.DataReader, code, today)
+                result['code'] = code
+                return result
+            
+        async def async_fdr_datareader_all(semaphore, codes):
+            today = pd.Timestamp.now().date()
+            tasks = [asyncio.create_task(async_fdr_datareader(semaphore, code, today)) for code in codes]
+            results = await asyncio.gather(*tasks)
+            df = pd.concat(results)
+            df.reset_index(inplace=True)
+            return df            
+        
+        result_df = asyncio.run(async_fdr_datareader_all(semaphore, codes))
+        return result_df
+        
+        
     async def _get_news_from_stockplus_today():
         """
         news

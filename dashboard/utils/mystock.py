@@ -4,17 +4,15 @@ import requests
 import FinanceDataReader as fdr
 from dashboard.utils import chart
 from dashboard.utils.sean_func import Sean_func
-from dashboard import models
-from dashboard.models import InvestorTrading
-
-
+from django.db.models import F, Subquery, OuterRef, Q, Sum, Count
 from bokeh.models import ColumnDataSource, Range1d
 from bokeh.models import RangeTool,HoverTool,Span,DataRange1d,CustomJS
 from bokeh.plotting import figure, show
 from bokeh.models.formatters import NumeralTickFormatter
 from bokeh.layouts import gridplot, column, row
 from bokeh.models import FactorRange, LabelSet
-
+from plotly.subplots import make_subplots
+import plotly.graph_objects as go
 
 class GetData:
 
@@ -90,25 +88,25 @@ class ElseInfo:
 class Stock:
 
     def __init__(self, code, start_date=None, end_date=None, anal=False):
-
+        self.c_year, self.f_yaer = ElseInfo.check_y_current ## 현재year 미래yaer 
         self.code = code
-
-        self.ticker = models.Ticker.objects.get(code=self.code)
-        self.info: models.Info = self.ticker.info
+        from dashboard.models import Ticker, Info, Finstats
+        self.ticker = Ticker.objects.get(code=self.code)
+        self.info: Info = self.ticker.info
         self.액면가 = self.info.액면가
-        self.상장주식수 = self.info.상장주식수
+        self.상장주식수 = self.info.상장주식수 if self.info.상장주식수 else self.info.보통발행주식수
         self.유동비율 = self.info.유동비율
-        self.유동주식수 = (
+        self.유동주식수 = int(
             self.상장주식수 * self.유동비율 / 100 if self.유동비율 else self.상장주식수
-        )
+        ) if self.유동비율 else self.상장주식수
         self.외국인소진율 = self.info.외국인소진율
-
-        self.ohlcv_day = models.Ohlcv.get_data(self.ticker)
+        from dashboard.models import Ohlcv
+        self.ohlcv_day = Ohlcv.get_data(self.ticker)
         self.chart_d: chart.Chart = chart.Chart(
             self.ohlcv_day,
             mas=[3, 5, 10, 20, 60, 120, 240],
             상장주식수=self.상장주식수,
-            유동주식수=self.상장주식수 * self.유동비율,
+            유동주식수=self.유동주식수,
         )
         if anal:
             # 5 30 받아서 chart 생성 . 후 필요한 값만 가져오기.
@@ -135,8 +133,71 @@ class Stock:
         # investor
         self.investor_part = self.get_investor_part()
 
+        # fin status
+        self.fin_df, self.fin_df_q = self.get_fin_status()
+        
+        # ## 연간 매출액, 영업이익, 당기순이익 데이터 가져오기. ==> models에 함수로 이동하기
+        # fin: Finstats = self.ticker.finstats_set
+        # fin_y_qs = fin.filter(fintype="연결연도", quarter=0).values(
+        #     "year", "매출액", "영업이익", "당기순이익"
+        # )
+        # fin_qs_q = (
+        #     fin.exclude(quarter=0)
+        #     .filter(fintype="연결분기")
+        #     .values("year", "quarter", "매출액", "영업이익", "당기순이익")
+        # )
+
+        # self.fin_df = pd.DataFrame(fin_y_qs) if fin_y_qs else None
+        # self.fin_df_q = pd.DataFrame(fin_qs_q) if fin_qs_q else None
+        # # if fin_df:
+        # if self.fin_df is not None and (isinstance(self.fin_df, pd.DataFrame) and not self.fin_df.empty):
+        #     self.fin_df.set_index("year")
+        # # if self.fin_df_q:
+        # if self.fin_df_q is not None and (isinstance(self.fin_df_q, pd.DataFrame) and not self.fin_df_q.empty):
+        #     self.fin_df_q["index"] = (
+        #         self.fin_df_q["year"].astype(str)
+        #         + "/"
+        #         + self.fin_df_q["quarter"].astype(str).str.zfill(2)
+        #     )
+        #     self.fin_df_q = self.fin_df_q.set_index("index")
+       
+    
+    def get_fin_status(self):
+        
+        
+        def _get_성장율(data, gap=1):
+            ''' 적자 = -10000, 턴어라운드 = -1000'''
+            new_data = []
+            for i in range(len(data)):
+                if i > 0:
+                    cur = data[i]
+                    pre = data[i-gap]
+                    if cur < 0 :
+                        value = -10000 # 적자
+                        new_data.append(value)
+                        continue
+                    else:
+                        if pre <= 0:
+                            value = -1000 # 턴어라운드
+                            new_data.append(value)
+                            continue
+                        else:
+                            # 성장율 표기 
+                            value = round(((cur - pre) / pre) * 100 , 1)
+                            new_data.append(value)
+                            continue
+                else:
+                    cur= data[i]
+                    if cur < 0 :
+                        value = -10000
+                    else:
+                        value = None
+                    new_data.append(value)
+            return new_data   
+        
+        
         ## 연간 매출액, 영업이익, 당기순이익 데이터 가져오기. ==> models에 함수로 이동하기
-        fin: models.Finstats = self.ticker.finstats_set
+        fin: Finstats = self.ticker.finstats_set
         fin_y_qs = fin.filter(fintype="연결연도", quarter=0).values(
             "year", "매출액", "영업이익", "당기순이익"
         )
@@ -146,24 +207,36 @@ class Stock:
             .values("year", "quarter", "매출액", "영업이익", "당기순이익")
         )
 
-        fin_df = pd.DataFrame(fin_y_qs)
-        fin_df_q = pd.DataFrame(fin_qs_q)
-        fin_df = fin_df.set_index("year")
-        fin_df_q["index"] = (
-            fin_df_q["year"].astype(str)
-            + "/"
-            + fin_df_q["quarter"].astype(str).str.zfill(2)
-        )
-        fin_df_q = fin_df_q.set_index("index")
-
+        self.fin_df = pd.DataFrame(fin_y_qs) if fin_y_qs else None
+        self.fin_df_q = pd.DataFrame(fin_qs_q) if fin_qs_q else None
+        
+        if self.fin_df is not None and (isinstance(self.fin_df, pd.DataFrame) and not self.fin_df.empty):
+            # self.fin_df = self.fin_df.set_index("year")
+            self.fin_df['growth'] = _get_성장율(self.fin_df['영업이익'])
+        
+        if self.fin_df_q is not None and (isinstance(self.fin_df_q, pd.DataFrame) and not self.fin_df_q.empty):
+            self.fin_df_q["index"] = (
+                self.fin_df_q["year"].astype(str)
+                + "/"
+                + self.fin_df_q["quarter"].astype(str).str.zfill(2)
+            )
+            self.fin_df_q = self.fin_df_q.set_index("index")
+            self.fin_df_q['yoy'] = _get_성장율(self.fin_df_q['영업이익'], gap=4)
+            self.fin_df_q['qoq'] = _get_성장율(self.fin_df_q['영업이익'])
+            
+        return self.fin_df, self.fin_df_q
+          
     # 날짜범위와 계산값 반환.  to_list or  dict
     def get_investor_part(self):
-
+        from dashboard.models import InvestorTrading
         ls = []
         low_dates = self._get_low_dates()
+        if not low_dates:
+            return None
         qs = InvestorTrading.objects.filter(ticker=self.ticker).filter(
             날짜__gte=low_dates[0]
         )
+        
         investor_df = pd.DataFrame(
             qs.values(
                 "날짜",
@@ -174,54 +247,94 @@ class Stock:
                 "매수거래대금",
             )
         )
-        investor_df["순매수거래대금"] = (
-            investor_df["매수거래대금"] - investor_df["매도거래대금"]
-        )
-        investor_df["순매수거래량"] = (
-            investor_df["매수거래량"] - investor_df["매도거래량"]
-        )
-        # 데이터 분리하고.
-        investor_df["날짜"] = pd.to_datetime(investor_df["날짜"])
-        for i in range(len(low_dates)):
-            temp_dic = {}
-            if len(low_dates) - 1 == i:
-                print("last")
-                start_date = low_dates[i]
-                temp_df = investor_df.loc[(investor_df["날짜"] >= start_date)]
-            else:
-                start_date, end_date = low_dates[i], low_dates[i + 1]
-                temp_df = investor_df.loc[
-                    (investor_df["날짜"] >= start_date)
-                    & (investor_df["날짜"] < end_date)
-                ]
+        if len(investor_df):
+            investor_df["순매수거래대금"] = (
+                investor_df["매수거래대금"] - investor_df["매도거래대금"]
+            )
+            investor_df["순매수거래량"] = (
+                investor_df["매수거래량"] - investor_df["매도거래량"]
+            )
+            # 데이터 분리하고.
+            investor_df["날짜"] = pd.to_datetime(investor_df["날짜"])
+            for i in range(len(low_dates)):
+                temp_dic = {}
+                if len(low_dates) - 1 == i:
+                    start_date = low_dates[i]
+                    temp_df = investor_df.loc[(investor_df["날짜"] >= start_date)]
+                else:
+                    start_date, end_date = low_dates[i], low_dates[i + 1]
+                    temp_df = investor_df.loc[
+                        (investor_df["날짜"] >= start_date)
+                        & (investor_df["날짜"] < end_date)
+                    ]
 
-            if len(temp_df):
-                temp_dic = self._cal_investor(temp_df)
-                ls.append(temp_dic)
-        print("low_dates: ", low_dates)
-        return ls
+                if len(temp_df):
+                    temp_dic = self._cal_investor(temp_df)
+                    ls.append(temp_dic)
+            try:
+                ## ma3값 넣기         
+                for item in ls:
+                    start = item['start']
+                    ## 투자자정보는 있어도 차트데이터가 없을때 그냥 ma3값 과 group값없이 반환.  ************************
+                    item['ma3'] = self.chart_d.ma3.data.loc[start]  
+                
+                ## group 넣기. 
+                n = 7  ## 이격도가 7 이상벌어진것을 그룹으로 간주. 
+                result_df = pd.DataFrame(ls)
+                group_num = 1
+                for i in range(len(result_df)-1):
+                    a = result_df.iloc[i]['ma3']
+                    b =  result_df.iloc[i+1]['ma3']
+                    first_value = a
+                    pct_first = round((abs(first_value-b) / first_value) * 100,2)  # 그룹 초기값과의 이격도.
+                    pct = round((abs(a-b) / a) * 100,2) # 현재값과 다음값과의 이격도.
+                    date = result_df['start'].iloc[i]
+                    
+                    if i ==0:
+                        result_df.loc[i,'group'] = group_num
+                        continue
+                        
+                    if (pct > n) & (pct_first > n):
+                        result_df.loc[i,'group'] = group_num
+                        front_value = b
+                        group_num  +=1
+                    else:
+                        result_df.loc[i,'group'] = group_num
+                result_df.loc[i+1,'group'] = group_num
+            except:
+                result_df = pd.DataFrame(ls)
+                return result_df
+        else:
+            return None
+        return result_df
 
     def _get_low_dates(self):
-        low3 = self.chart_d.ma3.df_last_low_points
-        low3_all = self.chart_d.ma3.df_all_low_points
-        low20 = self.chart_d.ma20.df_last_low_points
+        low3 = self.chart_d.ma3.df_last_low_points if hasattr(self.chart_d, 'ma3') else None
+        low3_all = self.chart_d.ma3.df_all_low_points if hasattr(self.chart_d, 'ma3') else None
+        low20 = self.chart_d.ma20.df_last_low_points if hasattr(self.chart_d, 'ma20') else None
         start_date = None
-        if len(low20) == 0:
-            if len(low3) == 0:
-                print("pass")
+        if low20 is None or (isinstance(low20, pd.DataFrame) and low20.empty):
+        # if not low20:
+            # if not low3:
+            if low3 is None or (isinstance(low3, pd.DataFrame) and low3.empty):
+                print("not exist ma3 low points")
             else:
                 start_date = low3.index[0]
-                print("3일로 지정.")
-            pass
+                print("not exist ma20 low points")
+            
         else:
+            # if len(low20) == 1:
             if len(low20) == 1:
                 date20 = low20.index[-1]
             else:
                 date20 = low20.index[-2]
             start_date = low3_all[low3_all.index < date20].index[-1]
-        print("start_date : ", start_date)
+        
         # low_dates = list(low3_all.loc[low3_all.index >= start_date].index) + [self.chart_d.df.index[-1]]
-        low_dates = list(low3_all.loc[low3_all.index >= start_date].index)
+        try:
+            low_dates = list(low3_all.loc[low3_all.index >= start_date].index)
+        except:
+            low_dates = None
         return low_dates
 
     def _cal_investor(self, df):
@@ -366,24 +479,79 @@ class Stock:
 
     ################  기술적 분석  ######################3
 
+    def is_good_consen(self, pct=0.3):
+        ''' 현재 년도대비 다음년도 성장율 (연결연도 영업이익 기준 ) pct '''
+        from dashboard.models import Finstats
+        result = self.ticker.finstats_set.filter(
+            year=self.f_yaer,
+            fintype='연결연도',
+            quarter=0,
+            영업이익__gt=0,  # 2024년 영업이익은 양수
+        ).annotate(
+            prev_year_profit=Subquery(
+                Finstats.objects.filter(
+                ticker=OuterRef('ticker'),
+                fintype='연결연도',
+                year=self.c_year,
+                quarter=0
+            ).values('영업이익')[:1]
+        )
+        ).filter(
+                    prev_year_profit__isnull=False,
+                    prev_year_profit__gt=0,     # 2023년 영업이익도 양수인 경우만
+                    영업이익__gte=F('prev_year_profit') * (1 + pct)
+        )
+        if result:
+            return True
+        else:
+            return False
+        
+        
+    def is_good_buy(self):
+        ''' 매집비를 어떻게 분석해야하나....?  '''
+        # self.investor_part 로 분석. 
+        # if self.investor_part is not None and isinstance(self.investor_part, pd.DataFrame) and not self.investor_part.empty:
+        pass
+        
+    
     def is_3w(self):
+        ''' is_3wa 인경우 5분봉으로 240선으로 판단하기.  '''
         pass
+    
+    def is_20w_3w(self):
+        ''' 20은 확실한 v 이고 is_3w 이고 3ma값이 20선 위에 있는것.  '''
+        
+        
+    ''' 나머진 그냥 coke 안에서 20 w , '''
 
-    def is_5w(self):
-        pass
-
-
+    ' value day 30 에서 코크. indicate 값 참조.'
+    
+    
     def plot(self, option="day"):
         if option == "day":
             chart = getattr(self, "chart_d")
-
-        df: pd.DataFrame = chart.df
-        df.columns = [col.lower() for col in df.columns]
-
+            arr_ma = np.array([3, 20, 60, 120, 240])
+        elif '30' in option :
+            if not hasattr(self, 'chart_30'):
+                self.chart_30 = GetData._get_ohlcv_from_daum(
+                code=self.code, data_type="30분봉"
+            ) 
+            chart = getattr(self, 'chart_30')
+            arr_ma = np.array([10, 20, 60, 120, 240])
+        elif '5' in option and hasattr(self, 'chart_5'):
+            if not hasattr(self, 'chart_5'):
+                self.chart_5 = GetData._get_ohlcv_from_daum(
+                code=self.code, data_type="5분봉"
+            ) 
+            chart = getattr(self, 'chart_5')
+            arr_ma = np.array([10, 20, 60, 120, 240])
+        else:
+            return None
+        
+        df: pd.DataFrame = chart.df.copy()
+        # df.columns = [col.lower() for col in df.columns] ## ?왜 바꾼거지.?
 
         ## ma 데이터 생성 ##################################################
-        arr_ma = np.array([3, 20, 60, 120, 240])
-        # arr_ma = np.array([10, 20, 60, 120, 240])
         color = ["black", "red", "blue", "green", "gray"]
         width = [1, 2, 3, 3, 3]
         alpha = [0.7, 0.7, 0.6, 0.6, 0.6 ]
@@ -412,7 +580,7 @@ class Stock:
             df["sun_width"] = chart.sun.two_line.width
 
         df["candle_color"] = [
-            "#f4292f" if row["open"] <= row["close"] else "#2a79e2"
+            "#f4292f" if row["Open"] <= row["Close"] else "#2a79e2"
             for _, row in df.iterrows()
         ]
 
@@ -422,31 +590,27 @@ class Stock:
 
         유동주식수 = self.유동주식수
         상장주식수 = self.상장주식수
-        print("유동주식수", 유동주식수)
-        print("상장주식수", 상장주식수)
 
         ## 거래량 color 지정 임시!
-        ac_cond = df["volume"] > df["volume"].shift(1) * 2
+        ac_cond = df["Volume"] > df["Volume"].shift(1) * 2
         df["vol_color"] = ["#f4292f" if bl else "#808080" for bl in ac_cond]
 
-        low_cond = df["volume"] < df["vol20ma"]  # 평균보다 작은조건
+        low_cond = df["Volume"] < df["vol20ma"]  # 평균보다 작은조건
         df["vol_color"] = [
             "blue" if bl else value for value, bl in zip(df["vol_color"], low_cond)
         ]
 
         if 유동주식수:
-            cond_유통주식수 = df["volume"] >= 유동주식수
+            cond_유통주식수 = df["Volume"] >= 유동주식수
             if sum(cond_유통주식수):
-                print("1")
                 df["vol_color"] = [
                     "#ffff00" if bl else value
                     for value, bl in zip(df["vol_color"], cond_유통주식수)
                 ]
 
         if 상장주식수:
-            cond_상장주식수 = df["volume"] >= 상장주식수
+            cond_상장주식수 = df["Volume"] >= 상장주식수
             if sum(cond_상장주식수):
-                print("2")
                 df["vol_color"] = [
                     "#800080" if bl else value
                     for value, bl in zip(df["vol_color"], cond_상장주식수)
@@ -459,18 +623,20 @@ class Stock:
         source = ColumnDataSource(df)
         
         
-        if len(self.investor_part):
+        # if self.investor_part:
+        if self.investor_part is not None and isinstance(self.investor_part, pd.DataFrame) and not self.investor_part.empty:
             invest_df = pd.DataFrame(self.investor_part)
-            invest_df.set_index('start',inplace=True)
-            invest_df['ma3']= chart.ma3.data
-            invest_df.reset_index(inplace=True)
             invest_df['start'] = invest_df['start'].dt.strftime('%Y-%m-%d')
             invest_df['end'] = invest_df['end'].dt.strftime('%Y-%m-%d')
             invest_df['text'] = '주도기관: ' + invest_df['주도기관'] + '\n' + \
             '순매수금(억): ' + invest_df['순매수금_억'].map(lambda x: f"{x:.1f}") + '\n' +  \
             '매집비: ' + invest_df['매집비'].map(lambda x: f"{x:.1f}%") + '\n' +  \
-            '풀매수기관: ' + invest_df['풀매수기관'] + '\n' 
-            
+            '풀매수기관: ' + invest_df['풀매수기관'].map(lambda x: ','.join(x) if not type(float) else '')
+            # '풀매수기관: ' + invest_df['풀매수기관'] + '\n' 
+            try:
+                self.investor_part['group_color'] = np.where(self.investor_part['group'] % 2 == 0, 'blue', 'orange')
+            except:
+                self.investor_part['group_color'] = 'blue'
             source_investor = ColumnDataSource(invest_df)
         
         
@@ -506,17 +672,17 @@ class Stock:
         ## 캔들차트 그리기
         p1.segment(
             "Date",
-            "high",
+            "High",
             "Date",
-            "low",
+            "Low",
             color="candle_color",
             source=source,
         )
         p1.vbar(
             "Date",
             0.6,
-            "open",
-            "close",
+            "Open",
+            "Close",
             color="candle_color",
             line_width=0,
             source=source,
@@ -543,23 +709,20 @@ class Stock:
                     source=source,
                     )
                     
-        ## label 넣기
-        if len(self.investor_part):
-            labels = LabelSet(x='start', y='ma3', text='text', source=source_investor,
-                              background_fill_alpha=0.3,  # 배경 투명도 설정
-                              background_fill_color='gray',
-                              text_font_size="3pt",  # 텍스트 크기 지정
-                              text_color="navy", 
-                              text_align="left", 
-                              x_offset=-30, y_offset=-30) ## 덱스트박스 위치맞추기기 어려움. 
-            p1.add_layout(labels)
-            
-            # 점 그리기
-            p1.scatter('start', 'ma3', size=10, source=source_investor)
-        
-        
-        
-        
+        ## label 넣기 .. 라벨넣지 말고 표로 넣자 그냥.  점만 그리기. 
+        # if len(self.investor_part):
+        if self.investor_part is not None and isinstance(self.investor_part, pd.DataFrame) and not self.investor_part.empty:
+            if 'group' in df.columns and 'ma3' in df.columns:
+                # labels = LabelSet(x='start', y='ma3', text='text', source=source_investor,
+                #                   background_fill_alpha=0.3,  # 배경 투명도 설정
+                #                   background_fill_color='gray',
+                #                   text_font_size="10pt",  # 텍스트 크기 지정
+                #                   text_color="navy", 
+                #                   text_align="left", 
+                #                   x_offset=-30, y_offset=-30) ## 덱스트박스 위치맞추기기 어려움. 
+                # p1.add_layout(labels)
+            # 그룹별로 점 추가
+                p1.scatter('start', 'ma3', fill_color='group_color', size=8, alpha=0.6, source=source_investor )
         
                     
         ## p2 거래량차트 그리기 ################################################33
@@ -571,7 +734,7 @@ class Stock:
 
         p2.vbar(
             x="Date",
-            top="volume",
+            top="Volume",
             width=0.7,
             fill_color="vol_color",
             line_width=0,
@@ -617,7 +780,7 @@ class Stock:
         range_tool.overlay.fill_color = "navy"
         range_tool.overlay.fill_alpha = 0.2
 
-        range_bar.line("Date", "close", source=source)
+        range_bar.line("Date", "Close", source=source)
         range_bar.ygrid.grid_line_color = None
         range_bar.add_tools(range_tool)        
         
@@ -663,7 +826,7 @@ class Stock:
         p2.min_border_top = 0
 
         ## 거래량 최소값부터 보이기
-        p2.y_range.start = source.data["volume"].min() / 2
+        p2.y_range.start = source.data["Volume"].min() / 2
         p2.y_range = DataRange1d()  # Y축을 DataRange1d로 설정하여 동적 범위 설정
 
 
@@ -671,11 +834,11 @@ class Stock:
         hover = HoverTool()
         hover.tooltips = [
             ("Date:", "@Date{%F}"),
-            ("open", "@open{0,0}"),
-            ("high", "@high{0,0}"),
-            ("low", "@low{0,0}"),
-            ("close", "@close{0,0}"),
-            ("volume", "@volume{0,0}"),
+            ("open", "@Open{0,0}"),
+            ("high", "@High{0,0}"),
+            ("low", "@Low{0,0}"),
+            ("close", "@Close{0,0}"),
+            ("volume", "@Volume{0,0}"),
             ("volma20", "@vol20ma{0,0}"),
             ("upper240", "@upper{0,0}"),
             ("lower240", "@lower{0,0}"),
@@ -722,5 +885,225 @@ class Stock:
         
         return layout
 
+    def plot1(self, option='day'):
+        ## data 준비. 
+        if option == "day":
+            chart_obj = getattr(self, "chart_d")
+            arr_ma = np.array([3, 20, 60, 120, 240])
+        elif '30' in option :
+            if not hasattr(self, 'chart_30'):
+                self.chart_30 = GetData._get_ohlcv_from_daum(
+                code=self.code, data_type="30분봉"
+            ) 
+            chart_obj = getattr(self, 'chart_30')
+            arr_ma = np.array([10, 20, 60, 120, 240])
+        elif '5' in option and hasattr(self, 'chart_5'):
+            if not hasattr(self, 'chart_5'):
+                self.chart_5 = GetData._get_ohlcv_from_daum(
+                code=self.code, data_type="5분봉"
+            ) 
+            chart_obj = getattr(self, 'chart_5')
+            arr_ma = np.array([10, 20, 60, 120, 240])
+        else:
+            return None
+        
+        df: pd.DataFrame = chart_obj.df.copy()
+        df = chart_obj.df.reset_index()
+        sun_min = chart_obj.sun.line_min.data.reset_index()
+        sun_max = chart_obj.sun.line_max.data.reset_index()
+
+        # subplot 생성
+        fig = make_subplots(rows=2, cols=1, 
+                            shared_xaxes=True,
+                            # shared_yaxes=True,
+                            vertical_spacing=0.1,
+                            # subplot_titles=("Candlestick Chart", "Volume"),
+                            row_heights=[0.7, 0.3])
+
+        # 캔들차트 추가
+        fig.add_trace(
+            go.Candlestick(x=df['Date'],
+                        open=df['Open'],
+                        high=df['High'],
+                        low=df['Low'],
+                        close=df['Close'],
+                        name='',
+                        increasing=dict(line=dict(color='red')),  # 상승 시 빨간색
+                        decreasing=dict(line=dict(color='blue')),
+                        )
+            , row=1, col=1)
+
+
+        # 이동평균선 추가
+        colors = ['black', 'red','blue','green','gray']
+        widths = [1,2,2,2,3]
+        for ma, color, width in zip(arr_ma, colors, widths):
+            strma =  f"ma{ma}"
+            if hasattr(chart_obj, strma):
+                line_obj = getattr(chart_obj, strma)
+                ma_data = line_obj.data.reset_index()
+                fig.add_trace(
+                    go.Scatter(x=ma_data['Date'], 
+                            y=ma_data[f'{strma}'], 
+                            mode='lines', 
+                            name='', 
+                            line=dict(color=color, width=width),
+                            ), 
+                    row=1, col=1)
+
+        # bb 추가
+        bb_names = ['bb60','bb240']
+        bb_colors = ['blue','gray']
+        bb_widths = [2,4]
+        for bb_name, bb_color, bb_width in zip(bb_names, bb_colors, bb_widths):
+            if hasattr(chart_obj, bb_name):
+                bb_obj = getattr(chart_obj, bb_name) 
+                for line in [bb_obj.line_lower.data, bb_obj.line_upper.data]:
+                    fig.add_trace(go.Scatter(
+                                x=line.reset_index()['Date'], 
+                                y=line, 
+                                mode='lines', 
+                                name='', 
+                                line=dict(color=bb_color, width=bb_width),
+                                ), 
+                                row=1, col=1)
+
+        ###########################################################################################
+        # sun 두 선 사이를 채우기
+        # 두 번째 선과의 채우기
+        fig.add_trace(go.Scatter(
+            x=sun_max['Date'],
+            y=sun_max['max'],
+            mode='lines',
+            line=dict(color='rgba(0,0,0,0)'),  # 투명한 선
+            showlegend=False,
+            fill='tonexty',  # 다음 y축으로 채우기
+            fillcolor='rgba(255,165,0,0.2)',  # 채우기 색상
+        ), row=1, col=1)
+
+        fig.add_trace(go.Scatter(
+            x=sun_min['Date'],
+            y=sun_min['min'],
+            mode='lines',
+            line=dict(color='rgba(0,0,0,0)'),  # 투명한 선
+            showlegend=False,
+            fill='tonexty',  # 다음 y축으로 채우기
+            fillcolor='rgba(0,100,80,0.2)',  # 채우기 색상
+        ), row=1, col=1)
+
+
+        # 매물대 수평선 추가
+        price_values = chart_obj.pricelevel.first, chart_obj.pricelevel.second
+        widths = [2,1]
+        for value, width in zip(price_values, widths):
+            fig.add_shape(type='line',
+                        x0=chart_obj.pricelevel.start_date, x1=chart_obj.pricelevel.end_date,  # x축 범위 설정
+                        y0=value, y1=value,  # y축 값 설정
+                        line=dict(
+                            color='purple', 
+                            width=width, 
+                            # dash='dash',
+                        ),  # 선의 스타일 설정
+                        row=1, col=1)  # 첫 번째 서브플롯에 수평선 추가
+
+
+        ##############################################################################################
+
+        ## 거래량 바차트
+        ## 평균거래량 추가
+        vol20 = chart_obj.vol.ma_vol.reset_index()
+        fig.add_trace(
+            go.Scatter(x=vol20['Date'], 
+                    y=vol20[f'20ma'], 
+                    mode='lines', 
+                    name='', 
+                    line=dict(color='red', width=1),
+                    ), 
+            row=2, col=1)
+
+        # 상장주식수 수평선 추가
+        vol_values = [self.상장주식수, self.유동주식수]
+        widths = [3,1]
+        colors = ['red','purple']
+        for value, width, color in zip(vol_values, widths, colors):
+            if value:
+                fig.add_shape(type='line',
+                            x0=chart_obj.pricelevel.start_date, x1=chart_obj.pricelevel.end_date,  # x축 범위 설정
+                            y0=value, y1=value,  # y축 값 설정
+                            line=dict(
+                                color=color, 
+                                width=width, 
+                                dash='dash',
+                            ),  # 선의 스타일 설정
+                            row=2, col=1)  # 첫 번째 서브플롯에 수평선 추가
+
+        # 거래량 바 색상 설정
+        # vol20['20ma'] 보다 작은값 blue
+        vol_colors = ['blue' if vol < ma20 else 'gray' for vol, ma20 in zip(df['Volume'], vol20['20ma'])]
+        # 전일거래량 또는 전전일보다 2배이상 red
+        vol_colors = ['red' if pre_vol * 2 < vol else color 
+                    for pre_vol, vol, color in zip(df['Volume'].shift(1), df['Volume'],vol_colors)]
+        # 유동주식수보다 많은거 yellow
+        vol_colors = ['yellow' if self.유동주식수 <= vol else color 
+                    for color, vol in zip(vol_colors, df['Volume'])]
+        # 상장주식수보다 많은거 purple
+        vol_colors = ['purple' if self.상장주식수 <= vol else color 
+                    for color, vol in zip(vol_colors, df['Volume'])]
+
+        fig.add_trace(go.Bar(x=df['Date'], 
+                            y=df['Volume'], 
+                            name='', 
+                            marker_color=vol_colors), 
+                    row=2, col=1)
+
+
+        min_range = int(df['Volume'].iloc[-60:].min() * 0.8)
+        max_range = int(df['Volume'].iloc[-60:].max() * 1.2)
+        fig.update_yaxes(range=[min_range, max_range], row=2, col=1)  # 거래량 차트 y축 범위 설정
+
+        fig.update_yaxes(autorange=True, row=1, col=1)
+
+        # 존재하는 데이터 중 매월 첫 번째 날짜 추출
+
+        df['YearMonth'] = df['Date'].dt.to_period('M')  # 연-월로 변환
+        monthly_first_dates = df.groupby('YearMonth').first().reset_index()['Date']  # 첫 번째 날짜 추출
+        tick_labels = monthly_first_dates.dt.strftime('%Y-%m').tolist()  # 레이블 형식 설정
+
+        # 레이아웃 설정
+        fig.update_layout(title=f'{self.ticker.name}({self.ticker.code})',
+                        xaxis_title='',
+                        yaxis_title='Price',
+                        xaxis_rangeslider_visible=False,
+                        xaxis_type='category', # xaxis를 category로 설정 (빈공간 무시)
+                        width=800, 
+                        height=600,
+                        xaxis=dict(
+                            tickvals=monthly_first_dates,  # tick 위치 설정
+                            ticktext=tick_labels,  # tick 레이블 설정
+                        ), 
+                        showlegend=False,
+                        # dragmode='zoom'
+                        )  
+        fig.update_xaxes(type='category')
+        fig.update_xaxes(tickvals=monthly_first_dates, ticktext=tick_labels, row=2, col=1)
+
+
+        # y축 동기화
+        fig.update_xaxes(matches='x')
+
+        '''
+        fig = stock.plot1()
+        graph_html = fig.to_html(full_html=False)
+        
+        1. 쥬피터 노트북 
+        from IPython.display import display, HTML
+        display(HTML(graph_html))
+        
+        2. 장고
+        context = {graph : graph_html}
+        '''
+        return fig
+    
+    
     def __repr__(self):
         return f"<Stock> {self.ticker.name}({self.ticker.code})"

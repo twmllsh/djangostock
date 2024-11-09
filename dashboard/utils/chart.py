@@ -1271,9 +1271,11 @@ class Candle:
         n_for_df = -(n봉전 + 1)
         data = self.df.iloc[n_for_df]  #
 
+    
         c_data = self.__candle_status(
             data["Open"], data["High"], data["Low"], data["Close"]
         )
+    
         return c_data
 
     def get_short_candle_date(
@@ -1588,11 +1590,13 @@ class PriceLevel:
     매물대
     """
 
-    def __init__(self, df):
+    def __init__(self, df, period=120):
         """
         pricelevel1 : 첫번째매물대
         """
-        self.first, self.second = self._get_price_level(df)
+        self.period = period
+        
+        self.first, self.second = self._get_price_level(df, period=120) ## 6개월! 
 
     def _get_price_level(self, df, parts=10, period=240):
         """
@@ -1600,6 +1604,7 @@ class PriceLevel:
         return : list 240거래일기준 가장많은 매물대 1, 2위 가격.
         """
         df = df[-period:].copy()
+        self.start_date , self.end_date= df.index[0], df.index[-1] # 범위
         df = df[["Close", "Open", "High", "Low", "Volume"]]
         all_v = df["Volume"].sum()
         df["rate_v"] = df["Volume"] / all_v
@@ -2272,7 +2277,7 @@ class Chart:
             print("have no bb240")
             return False
         if "line_upper" not in dir(self.bb240):
-            print("have no bb240.line_upper")
+            print("have no bb240.line_upper") if verbose else None
             return False
             # cond_upper_direct = self.upper_inclination20 > -1
         cond_upper_direct = self.bb240.line_upper.inclination20_value > -1

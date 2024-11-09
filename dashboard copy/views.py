@@ -201,7 +201,8 @@ def plot_test(request):
     ma = request.GET.get('ma',"")
     print(f"code: {code}")
     print(f"ma: {ma}")
-    from .utils.mystock import Stock
+    # from .utils.mystock import Stock
+    from dashboard.utils.mystock import Stock
     charts = []
     try:
         stock = Stock(f'{code}', anal=True)

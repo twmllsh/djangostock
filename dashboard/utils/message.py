@@ -26,7 +26,7 @@ class My_discord:
        
         if webhook_url is None:
             webhook_url = settings.MYENV('DISCORD_WEBHOOK_URL')
-            print("webhook_url:" , webhook_url)
+            # print("webhook_url:" , webhook_url)
         
         self.data_path = os.path.dirname(os.path.realpath(__file__)) 
         self.wh = SyncWebhook.from_url(webhook_url)
