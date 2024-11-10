@@ -1104,6 +1104,62 @@ class Stock:
         '''
         return fig
     
+    def plot_consen(self, gb='y'):
+        '''
+        y: 연간, q: 분기
+        '''
+        if gb=='y':
+            if self.fin_df:
+                df = self.fin_df.copy()
+                df['text'] = df['growth'].apply(lambda x: "적자" if x == -10000 else '턴어라운드' 
+                                                if x==-1000 else f"{x} %")        
+                df['text'] = df['text'].astype(str) + "<br>(" +  df['영업이익'].astype(int).apply(lambda x:f"{x:,}") + "억원)"
+                title = 'Year'
+        else:
+            if self.fin_df_q:
+                df = self.fin_df_q.copy()
+                df['year'] = df.index
+                df['text_yoy'] = df['yoy'].apply(lambda x: "yoy : 적자" if x == -10000 else 'yoy : 턴어라운드' 
+                                                if x==-1000 else f"yoy :{x} %")  
+                df['text_qoq'] = df['qoq'].apply(lambda x: "qoq : 적자" if x == -10000 else 'qoq : 턴어라운드' 
+                                                if x==-1000 else f"qoq : {x} %")  
+                df['text'] = df['text_yoy'] + "<br>" + df['text_qoq']
+                title = 'Quarter'
+        
+
+        fig = make_subplots(rows=1, cols=1, specs=[[{'secondary_y': True}]])
+
+        fig.add_trace(
+            go.Scatter(
+                x = df['year'],
+                y = df['매출액'],
+                mode = 'lines+markers+text',
+                name = '매출액(억)',
+                line = dict(color='red', width=2),
+                marker= dict(size=8, color='red'),
+            ), secondary_y=False
+        )
+        fig.add_trace(
+            go.Scatter(
+                x = df['year'],
+                y = df['영업이익'],
+                mode = 'lines+markers+text',
+                name = '영업이익(억)',
+                text = df['text'],
+                textposition='bottom center',
+                textfont=dict(color='black',size=12),  # 텍스트 색상 설정
+                line = dict(color='blue', width=2),
+                marker= dict(size=8, color='blue'),
+            ), secondary_y=True
+        )
+        fig.update_yaxes(title_text='매출(억원)', secondary_y=False)
+        fig.update_yaxes(title_text='영업이익(억원)', secondary_y=True)
+
+        # 레이아웃 설정
+        fig.update_layout(title=title)
+        return fig
+    
+    
     
     def __repr__(self):
         return f"<Stock> {self.ticker.name}({self.ticker.code})"
