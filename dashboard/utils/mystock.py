@@ -88,7 +88,8 @@ class ElseInfo:
 class Stock:
 
     def __init__(self, code, start_date=None, end_date=None, anal=False):
-        self.c_year, self.f_yaer = ElseInfo.check_y_current ## 현재year 미래yaer 
+        self.c_year, self.f_year = ElseInfo.check_y_current ## 현재year 미래yaer 
+        self.quarters = ElseInfo.check_q_current
         self.code = code
         from dashboard.models import Ticker, Info, Finstats
         self.ticker = Ticker.objects.get(code=self.code)
@@ -1104,27 +1105,29 @@ class Stock:
         '''
         return fig
     
-    def plot_consen(self, gb='y'):
+    def plot_consen(self, gb='y', limit=6):
         '''
         y: 연간, q: 분기
         '''
         if gb=='y':
-            if self.fin_df:
-                df = self.fin_df.copy()
+            if self.fin_df is not None and (isinstance(self.fin_df, pd.DataFrame) and not self.fin_df.empty):
+                df = self.fin_df.copy().iloc[-limit:]
                 df['text'] = df['growth'].apply(lambda x: "적자" if x == -10000 else '턴어라운드' 
                                                 if x==-1000 else f"{x} %")        
                 df['text'] = df['text'].astype(str) + "<br>(" +  df['영업이익'].astype(int).apply(lambda x:f"{x:,}") + "억원)"
-                title = 'Year'
+                title = f'Year {self.ticker.name}({self.ticker.code})'
+                ext_x = self.f_year
         else:
-            if self.fin_df_q:
-                df = self.fin_df_q.copy()
+            if self.fin_df_q is not None and (isinstance(self.fin_df_q, pd.DataFrame) and not self.fin_df_q.empty):
+                df = self.fin_df_q.copy().iloc[-limit:]
                 df['year'] = df.index
                 df['text_yoy'] = df['yoy'].apply(lambda x: "yoy : 적자" if x == -10000 else 'yoy : 턴어라운드' 
                                                 if x==-1000 else f"yoy :{x} %")  
                 df['text_qoq'] = df['qoq'].apply(lambda x: "qoq : 적자" if x == -10000 else 'qoq : 턴어라운드' 
                                                 if x==-1000 else f"qoq : {x} %")  
                 df['text'] = df['text_yoy'] + "<br>" + df['text_qoq']
-                title = 'Quarter'
+                title = f'Quarter {self.ticker.name}({self.ticker.code})'
+                ext_x = self.quarters[-1]
         
 
         fig = make_subplots(rows=1, cols=1, specs=[[{'secondary_y': True}]])
@@ -1155,6 +1158,13 @@ class Stock:
         fig.update_yaxes(title_text='매출(억원)', secondary_y=False)
         fig.update_yaxes(title_text='영업이익(억원)', secondary_y=True)
 
+        ## 특정연도분기 표기
+        if ext_x in str(df['year']):
+            fig.add_vline(x=ext_x,
+                line_color="magenta",
+                line_width=80, 
+                opacity=0.3, 
+                )
         # 레이아웃 설정
         fig.update_layout(title=title)
         return fig
