@@ -172,7 +172,16 @@ class Stock:
             for i in range(len(data)):
                 if i > 0:
                     cur = data[i]
-                    pre = data[i-gap]
+                    if cur is None:
+                        value = None
+                        new_data.append(value)
+                        continue
+                    try:
+                        pre = data[i-gap]
+                    except:
+                        value = None
+                        new_data.append(value)
+                        continue
                     if cur < 0 :
                         value = -10000 # 적자
                         new_data.append(value)
@@ -189,10 +198,13 @@ class Stock:
                             continue
                 else:
                     cur= data[i]
-                    if cur < 0 :
-                        value = -10000
+                    if cur is not None:
+                        if cur < 0 :
+                            value = -10000
+                        else:
+                            value = None
                     else:
-                        value = None
+                        value= None
                     new_data.append(value)
             return new_data   
         
@@ -484,7 +496,7 @@ class Stock:
         ''' 현재 년도대비 다음년도 성장율 (연결연도 영업이익 기준 ) pct '''
         from dashboard.models import Finstats
         result = self.ticker.finstats_set.filter(
-            year=self.f_yaer,
+            year=self.f_year,
             fintype='연결연도',
             quarter=0,
             영업이익__gt=0,  # 2024년 영업이익은 양수
@@ -995,17 +1007,19 @@ class Stock:
 
         # 매물대 수평선 추가
         price_values = chart_obj.pricelevel.first, chart_obj.pricelevel.second
+        
         widths = [2,1]
         for value, width in zip(price_values, widths):
-            fig.add_shape(type='line',
-                        x0=chart_obj.pricelevel.start_date, x1=chart_obj.pricelevel.end_date,  # x축 범위 설정
-                        y0=value, y1=value,  # y축 값 설정
-                        line=dict(
-                            color='purple', 
-                            width=width, 
-                            # dash='dash',
-                        ),  # 선의 스타일 설정
-                        row=1, col=1)  # 첫 번째 서브플롯에 수평선 추가
+            if not value is None:
+                fig.add_shape(type='line',
+                            x0=chart_obj.pricelevel.start_date, x1=chart_obj.pricelevel.end_date,  # x축 범위 설정
+                            y0=value, y1=value,  # y축 값 설정
+                            line=dict(
+                                color='purple', 
+                                width=width, 
+                                # dash='dash',
+                            ),  # 선의 스타일 설정
+                            row=1, col=1)  # 첫 번째 서브플롯에 수평선 추가
 
 
         ##############################################################################################
@@ -1023,20 +1037,19 @@ class Stock:
             row=2, col=1)
 
         # 상장주식수 수평선 추가
-        vol_values = [self.상장주식수, self.유동주식수]
+        x_values = [self.상장주식수, self.유동주식수]
         widths = [3,1]
         colors = ['red','purple']
-        for value, width, color in zip(vol_values, widths, colors):
+        for value, width, color in zip(x_values, widths, colors):
             if value:
-                fig.add_shape(type='line',
-                            x0=chart_obj.pricelevel.start_date, x1=chart_obj.pricelevel.end_date,  # x축 범위 설정
-                            y0=value, y1=value,  # y축 값 설정
-                            line=dict(
-                                color=color, 
-                                width=width, 
-                                dash='dash',
-                            ),  # 선의 스타일 설정
-                            row=2, col=1)  # 첫 번째 서브플롯에 수평선 추가
+                fig.add_hline(y=value,
+                              line_dash='dot',
+                                line_color=color,
+                                line_width=5, 
+                                opacity=0.7, 
+                                row=2, 
+                                col=1,
+                                )
 
         # 거래량 바 색상 설정
         # vol20['20ma'] 보다 작은값 blue

@@ -953,7 +953,7 @@ class Rsi:
                 < self._low_value
             )
             > 0
-        )
+        ) if len(self.line_rsi.df_last_low_points) > 0 else False
 
         # 현재는 low_value 위로 올라온것.
         cond_current_value = self.current_value > self._low_value
@@ -1614,7 +1614,10 @@ class PriceLevel:
         min_price = df["Low"].min()
         bins = np.linspace(min_price, max_price, parts)
         labels = [str(int((bins[i] + bins[i + 1]) / 2)) for i in range(len(bins) - 1)]
-        df["bin"] = pd.cut(df["mprice"], bins=bins, labels=labels)
+        try:
+            df["bin"] = pd.cut(df["mprice"], bins=bins, labels=labels)
+        except:
+            return None, None
         result = (
             df.groupby("bin", observed=True)
             .sum()["rate_v"]
