@@ -1063,11 +1063,13 @@ class Stock:
         vol_colors = ['red' if pre_vol * 2 < vol else color 
                     for pre_vol, vol, color in zip(df['Volume'].shift(1), df['Volume'],vol_colors)]
         # 유동주식수보다 많은거 yellow
-        vol_colors = ['yellow' if self.유동주식수 <= vol else color 
-                    for color, vol in zip(vol_colors, df['Volume'])]
+        if self.유동주식수:
+            vol_colors = ['yellow' if self.유동주식수 <= vol else color 
+                        for color, vol in zip(vol_colors, df['Volume'])]
         # 상장주식수보다 많은거 purple
-        vol_colors = ['purple' if self.상장주식수 <= vol else color 
-                    for color, vol in zip(vol_colors, df['Volume'])]
+        if self.상장주식수:
+            vol_colors = ['purple' if self.상장주식수 <= vol else color 
+                        for color, vol in zip(vol_colors, df['Volume'])]
 
         fig.add_trace(go.Bar(x=df['Date'], 
                             y=df['Volume'], 
