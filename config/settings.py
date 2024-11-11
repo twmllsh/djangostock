@@ -40,7 +40,14 @@ SECRET_KEY = MYENV.str(
 # DEBUG = True
 DEBUG = MYENV.bool("DEBUG", default=True) ## DEBUG 값이 있으면 가져오고 아니면 True값
 # DEBUG = MYENV.bool("DEBUG", default=False) ## DEBUG 값이 있으면 가져오고 아니면 True값
-
+if DEBUG:
+    print("###########################################")
+    print("DEBUG 모드 작동!! ")
+    print("###########################################")
+else:
+    print("###########################################")
+    print("실제 서버 작동")
+    print("###########################################")
 # ALLOWED_HOSTS = []
 ALLOWED_HOSTS = MYENV.list("ALLOWED_HOSTS", default=["*"])
 
