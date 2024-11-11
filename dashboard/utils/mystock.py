@@ -899,24 +899,29 @@ class Stock:
         return layout
 
     def plot1(self, option='day'):
+        title = f'{self.ticker.name}({self.ticker.code})'
         ## data 준비. 
         if option == "day":
             chart_obj = getattr(self, "chart_d")
             arr_ma = np.array([3, 20, 60, 120, 240])
-        elif '30' in option :
+        elif '30' in str(option) :
             if not hasattr(self, 'chart_30'):
-                self.chart_30 = GetData._get_ohlcv_from_daum(
+                new_ohlcv = GetData._get_ohlcv_from_daum(
                 code=self.code, data_type="30분봉"
             ) 
+                self.chart_30 = chart.Chart(new_ohlcv)
             chart_obj = getattr(self, 'chart_30')
             arr_ma = np.array([10, 20, 60, 120, 240])
-        elif '5' in option and hasattr(self, 'chart_5'):
+            title += ' 30분봉'
+        elif '5' in str(option):
             if not hasattr(self, 'chart_5'):
-                self.chart_5 = GetData._get_ohlcv_from_daum(
+                new_ohlcv = GetData._get_ohlcv_from_daum(
                 code=self.code, data_type="5분봉"
             ) 
+                self.chart_5 = chart.Chart(new_ohlcv)
             chart_obj = getattr(self, 'chart_5')
             arr_ma = np.array([10, 20, 60, 120, 240])
+            title += ' 5분봉'
         else:
             return None
         
@@ -1084,7 +1089,7 @@ class Stock:
         tick_labels = monthly_first_dates.dt.strftime('%Y-%m').tolist()  # 레이블 형식 설정
 
         # 레이아웃 설정
-        fig.update_layout(title=f'{self.ticker.name}({self.ticker.code})',
+        fig.update_layout(title=title,
                         xaxis_title='',
                         yaxis_title='Price',
                         xaxis_rangeslider_visible=False,
