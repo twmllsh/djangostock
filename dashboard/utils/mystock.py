@@ -117,19 +117,21 @@ class Stock:
             self.ohlcv_5 = GetData._get_ohlcv_from_daum(
                 code=self.code, data_type="5분봉"
             )
-            self.chart_30 = chart.Chart(
-                self.ohlcv_30,
-                mas=[10, 20, 60, 120, 240],
-                상장주식수=self.상장주식수,
-                유동주식수=self.상장주식수 * self.유동비율,
-            )
+            if isinstance(self.ohlcv_30, pd.DataFrame):
+                self.chart_30 = chart.Chart(
+                    self.ohlcv_30,
+                    mas=[10, 20, 60, 120, 240],
+                    상장주식수=self.상장주식수,
+                    유동주식수=self.유동주식수,
+                )
 
-            self.chart_5 = chart.Chart(
-                self.ohlcv_5,
-                mas=[10, 20, 60, 120, 240],
-                상장주식수=self.상장주식수,
-                유동주식수=self.상장주식수 * self.유동비율,
-            )
+            if isinstance(self.ohlcv_5, pd.DataFrame):
+                self.chart_5 = chart.Chart(
+                    self.ohlcv_5,
+                    mas=[10, 20, 60, 120, 240],
+                    상장주식수=self.상장주식수,
+                    유동주식수=self.유동주식수,
+                )
 
         # investor
         self.investor_part = self.get_investor_part()
@@ -314,7 +316,9 @@ class Stock:
                     else:
                         result_df.loc[i,'group'] = group_num
                 result_df.loc[i+1,'group'] = group_num
-            except:
+                result_df['group'] = result_df['group'].fillna(1).astype(int)
+            except Exception as e:
+                print(e, 'group 만들기 오류')
                 result_df = pd.DataFrame(ls)
                 return result_df
         else:
@@ -491,7 +495,43 @@ class Stock:
             return temp_dic
 
     ################  기술적 분석  ######################3
-
+    def get_data(self):
+        info_dic= {}
+        check_y1, check_y2 = ElseInfo.check_y_future
+        check_q = ElseInfo.check_q_current[-1]
+        
+        if isinstance(self.fin_df, pd.DataFrame):
+            df_y = self.fin_df.set_index('year')
+            info_dic["growth_y1"] = df_y.loc[int(check_y1), 'growth'] if int(check_y1) in df_y.index else None 
+            info_dic['growth_y2'] = df_y.loc[int(check_y2), 'growth'] if int(check_y2) in df_y.index else None 
+        if isinstance(self.fin_df_q, pd.DataFrame):
+            df_q = self.fin_df_q
+            info_dic['growth_q'] = df_q.loc[check_q, 'yoy'] if check_q in df_q.index else None 
+        
+        bb_texts = ['bb60','bb240']
+        for chart_name in ['chart_d','chart_30','chart_5']:
+            if hasattr(self, chart_name):
+                chart = getattr(self, chart_name)
+                for bb_text in bb_texts:
+                    if hasattr(chart, bb_text):
+                        bb = getattr(chart, bb_text)
+                        info_dic[f"{bb_text}_upper20"] = bb.upper_inclination20
+                        info_dic[f"{bb_text}_upper10"] = bb.upper_inclination10
+                        info_dic[f"{bb_text}_width"] = bb.cur_width
+        
+        info_dic[f"sun_width"] = chart.sun.width if hasattr(chart, 'sun') else None
+        
+        
+        
+        if not hasattr(self, 'chart_5'):
+            self.chart_5 = GetData._get_ohlcv_from_daum(
+            code=self.code, data_type="5분봉"
+        ) 
+        chart = getattr(self, 'chart_5')
+        
+           
+        
+        
     def is_good_consen(self, pct=0.3):
         ''' 현재 년도대비 다음년도 성장율 (연결연도 영업이익 기준 ) pct '''
         from dashboard.models import Finstats
@@ -898,7 +938,7 @@ class Stock:
         
         return layout
 
-    def plot1(self, option='day'):
+    def plot1(self, option='day', cnt=180):
         title = f'{self.ticker.name}({self.ticker.code})'
         ## data 준비. 
         if option == "day":
@@ -925,11 +965,18 @@ class Stock:
         else:
             return None
         
-        df: pd.DataFrame = chart_obj.df.copy()
-        df = chart_obj.df.reset_index()
-        sun_min = chart_obj.sun.line_min.data.reset_index()
-        sun_max = chart_obj.sun.line_max.data.reset_index()
+        df: pd.DataFrame = chart_obj.df.iloc[-cnt:].copy()
+        df = df.reset_index()
+        if option =='day':
+            start_date = df['Date'].iloc[0]
+            investor_part = self.investor_part.loc[self.investor_part['start'] >= start_date]
+            investor_part = investor_part.reset_index(drop=True)
+        
+        sun_min = chart_obj.sun.line_min.data.reset_index().iloc[-cnt:] if hasattr(chart_obj.sun, 'line_min') else None
+        sun_max = chart_obj.sun.line_max.data.reset_index().iloc[-cnt:] if hasattr(chart_obj.sun, 'line_max') else None
 
+        
+        
         # subplot 생성
         fig = make_subplots(rows=2, cols=1, 
                             shared_xaxes=True,
@@ -959,7 +1006,7 @@ class Stock:
             strma =  f"ma{ma}"
             if hasattr(chart_obj, strma):
                 line_obj = getattr(chart_obj, strma)
-                ma_data = line_obj.data.reset_index()
+                ma_data = line_obj.data.reset_index().iloc[-cnt:]
                 fig.add_trace(
                     go.Scatter(x=ma_data['Date'], 
                             y=ma_data[f'{strma}'], 
@@ -976,38 +1023,42 @@ class Stock:
         for bb_name, bb_color, bb_width in zip(bb_names, bb_colors, bb_widths):
             if hasattr(chart_obj, bb_name):
                 bb_obj = getattr(chart_obj, bb_name) 
-                for line in [bb_obj.line_lower.data, bb_obj.line_upper.data]:
-                    fig.add_trace(go.Scatter(
-                                x=line.reset_index()['Date'], 
-                                y=line, 
-                                mode='lines', 
-                                name='', 
-                                line=dict(color=bb_color, width=bb_width),
-                                ), 
-                                row=1, col=1)
+                for line in ["line_lower", "line_upper"]:
+                    if hasattr(bb_obj, f"{line}"):
+                        line_data = getattr(bb_obj, f"{line}").data
+                        line_data = line_data.iloc[-cnt:]
+                        fig.add_trace(go.Scatter(
+                                    x=line_data.reset_index()['Date'], 
+                                    y=line_data, 
+                                    mode='lines', 
+                                    name='', 
+                                    line=dict(color=bb_color, width=bb_width),
+                                    ), 
+                                    row=1, col=1)
 
         ###########################################################################################
         # sun 두 선 사이를 채우기
         # 두 번째 선과의 채우기
-        fig.add_trace(go.Scatter(
-            x=sun_max['Date'],
-            y=sun_max['max'],
-            mode='lines',
-            line=dict(color='rgba(0,0,0,0)'),  # 투명한 선
-            showlegend=False,
-            fill='tonexty',  # 다음 y축으로 채우기
-            fillcolor='rgba(255,165,0,0.2)',  # 채우기 색상
-        ), row=1, col=1)
+        if isinstance(sun_max, (pd.DataFrame, pd.Series)):
+            fig.add_trace(go.Scatter(
+                x=sun_max['Date'],
+                y=sun_max['max'],
+                mode='lines',
+                line=dict(color='rgba(0,0,0,0)'),  # 투명한 선
+                showlegend=False,
+                fill='tonexty',  # 다음 y축으로 채우기
+                fillcolor='rgba(255,165,0,0.2)',  # 채우기 색상
+            ), row=1, col=1)
 
-        fig.add_trace(go.Scatter(
-            x=sun_min['Date'],
-            y=sun_min['min'],
-            mode='lines',
-            line=dict(color='rgba(0,0,0,0)'),  # 투명한 선
-            showlegend=False,
-            fill='tonexty',  # 다음 y축으로 채우기
-            fillcolor='rgba(0,100,80,0.2)',  # 채우기 색상
-        ), row=1, col=1)
+            fig.add_trace(go.Scatter(
+                x=sun_min['Date'],
+                y=sun_min['min'],
+                mode='lines',
+                line=dict(color='rgba(0,0,0,0)'),  # 투명한 선
+                showlegend=False,
+                fill='tonexty',  # 다음 y축으로 채우기
+                fillcolor='rgba(0,100,80,0.2)',  # 채우기 색상
+            ), row=1, col=1)
 
 
         # 매물대 수평선 추가
@@ -1026,20 +1077,20 @@ class Stock:
                             ),  # 선의 스타일 설정
                             row=1, col=1)  # 첫 번째 서브플롯에 수평선 추가
 
-
         ##############################################################################################
 
         ## 거래량 바차트
         ## 평균거래량 추가
-        vol20 = chart_obj.vol.ma_vol.reset_index()
-        fig.add_trace(
-            go.Scatter(x=vol20['Date'], 
-                    y=vol20[f'20ma'], 
-                    mode='lines', 
-                    name='', 
-                    line=dict(color='red', width=1),
-                    ), 
-            row=2, col=1)
+        if hasattr(chart_obj.vol, 'ma_vol'):
+            vol20 = chart_obj.vol.ma_vol.reset_index().iloc[-cnt:]
+            fig.add_trace(
+                go.Scatter(x=vol20['Date'], 
+                        y=vol20[f'20ma'], 
+                        mode='lines', 
+                        name='', 
+                        line=dict(color='red', width=1),
+                        ), 
+                row=2, col=1)
 
         # 상장주식수 수평선 추가
         x_values = [self.상장주식수, self.유동주식수]
@@ -1058,7 +1109,10 @@ class Stock:
 
         # 거래량 바 색상 설정
         # vol20['20ma'] 보다 작은값 blue
-        vol_colors = ['blue' if vol < ma20 else 'gray' for vol, ma20 in zip(df['Volume'], vol20['20ma'])]
+        if hasattr(chart_obj.vol, 'ma_vol'):
+            vol_colors = ['blue' if vol < ma20 else 'gray' for vol, ma20 in zip(df['Volume'], vol20['20ma'])]
+        else:
+            vol_colors = ['gray' for vol in df['Volume']]
         # 전일거래량 또는 전전일보다 2배이상 red
         vol_colors = ['red' if pre_vol * 2 < vol else color 
                     for pre_vol, vol, color in zip(df['Volume'].shift(1), df['Volume'],vol_colors)]
@@ -1112,6 +1166,41 @@ class Stock:
         # y축 동기화
         fig.update_xaxes(matches='x')
 
+        
+        ## investor_part plot
+        if option =='day':
+            if isinstance(investor_part, pd.DataFrame):
+                import math
+                # color_palette = ['lightcoral','lightpink']
+                # group_cnt = len(investor_part['group'].unique())
+                # color_palette = color_palette * math.ceil(group_cnt/len(color_palette))
+                            
+                investor_part['text'] = '주도기관: ' + investor_part['주도기관'] + '<br>' + \
+                '순매수금(억): ' + investor_part['순매수금_억'].map(lambda x: f"{x:.1f}") + '<br>' +  \
+                '매집비: ' + investor_part['매집비'].map(lambda x: f"{x:.1f}%") + '<br>' +  \
+                '풀매수기관: ' + investor_part['풀매수기관'].map(lambda x: ','.join(x) if not type(float) else '')
+                 
+                try:
+                    investor_part['group_color'] = np.where(investor_part['group'] % 2 == 0, 'lightcoral', 'lightpink')
+                except:
+                    investor_part['group_color'] = 'blue'
+
+                annotations = [dict(
+                    x=row['start'], 
+                    y = row['ma3'], 
+                    text=row['text'],showarrow=True ,
+                    ax=0, ay=40,
+                    font=dict(color='black', size=8),
+                    bgcolor=row['group_color'],  # 배경 색상
+                    # bgcolor='lightpink',  # 배경 색상
+                    # bordercolor='black',    # 테두리 색상
+                    # borderwidth=2,          # 테두리 두께
+                    opacity=0.8,             # 투명도
+                    )
+                for _, row in investor_part.iterrows()]
+                fig.update_layout(annotations=annotations)
+                
+        
         '''
         fig = stock.plot1()
         graph_html = fig.to_html(full_html=False)
