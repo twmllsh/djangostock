@@ -133,22 +133,22 @@ pymysql.install_as_MySQLdb()
 
 if DEBUG:
     DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': "stock",
-            'USER': "sean",
-            'PASSWORD': "2402",
-            'HOST': "db",
-            'PORT': 5432,
-        },
         # 'default': {
         #     'ENGINE': 'django.db.backends.postgresql',
-        #     'NAME': MYENV.str("POSTGRES_DB", default="stock"),
-        #     'USER': MYENV.str("POSTGRES_USER", default="sean"),
-        #     'PASSWORD': MYENV.str("POSTGRES_PASSWORD", default="2402"),
-        #     'HOST': MYENV.str("POSTGRES_HOST", default="db"),
+        #     'NAME': "stock",
+        #     'USER': "sean",
+        #     'PASSWORD': "2402",
+        #     'HOST': "db",
         #     'PORT': 5432,
         # },
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': MYENV.str("POSTGRES_DB", default="stock"),
+            'USER': MYENV.str("POSTGRES_USER", default="sean"),
+            'PASSWORD': MYENV.str("POSTGRES_PASSWORD", default="2402"),
+            'HOST': MYENV.str("POSTGRES_HOST", default="db"),
+            'PORT': 5432,
+        },
         'mysql': {
             'ENGINE': 'django.db.backends.mysql',
             'NAME': "mysql_db",
