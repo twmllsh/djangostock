@@ -211,6 +211,9 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+# 정적 파일이 수집될 디렉토리
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
