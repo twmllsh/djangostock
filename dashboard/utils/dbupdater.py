@@ -1457,7 +1457,7 @@ class DBUpdater:
             bb_texts = ['bb60','bb240']
             for chart_name in ['chart_d','chart_30','chart_5']:
                 if hasattr(stock, chart_name):
-                    chart = getattr(stock, chart_name)
+                    chart  = getattr(stock, chart_name)
                     for bb_text in bb_texts:
                         if hasattr(chart, bb_text):
                             bb = getattr(chart, bb_text)
@@ -1484,7 +1484,23 @@ class DBUpdater:
                         info_dic['reasons'] += 'is_sun_gcv ' if chart.is_sun_gcv() else ''
                         info_dic['reasons'] += 'is_rsi ' if chart.is_rsi() else ''
                         info_dic['reasons'] += 'is_new_phase ' if chart.is_new_phase() else ''
-            
+                    
+                    info_dic['reasons_30'] = ""
+                    if chart_name=='chart_30':
+                        info_dic['reasons_30'] += 'is_w20_3w ' if chart.is_w20_3w() else ''
+                        info_dic['reasons_30'] += 'is_w3_ac ' if chart.is_w3_ac() else ''
+                        info_dic['reasons_30'] += 'is_sun_ac ' if chart.is_sun_ac(n봉전이내=4) else ''
+                        info_dic['reasons_30'] += 'is_coke_ac ' if chart.is_coke_ac(n봉전이내=4) else ''
+                        info_dic['reasons_30'] += 'is_multi_through ' if chart.is_multi_through(n봉전이내=4) else ''
+                        info_dic['reasons_30'] += 'is_abc ' if chart.is_abc() else ''
+                        info_dic['reasons_30'] += 'is_coke_gcv ' if chart.is_coke_gcv(bb_width=60) else ''
+                        info_dic['reasons_30'] += 'is_sun_gcv ' if chart.is_sun_gcv() else ''
+                        info_dic['reasons_30'] += 'is_rsi ' if chart.is_rsi() else ''
+                        info_dic['reasons_30'] += 'is_new_phase ' if chart.is_new_phase() else ''
+
+                    
+                    
+                    
             ls.append(info_dic)
 
             

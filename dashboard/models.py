@@ -440,6 +440,7 @@ class ChartValue(models.Model):
     chart_d_ab_v = models.BooleanField(null=True)
     chart_d_good_array = models.BooleanField(null=True)
     reasons = models.TextField(blank=True)
+    reasons_30 = models.TextField(blank=True)
     chart_30_bb60_upper20 = models.FloatField(null=True, blank=True)
     chart_30_bb60_upper10 = models.FloatField(null=True, blank=True)
     chart_30_bb60_upper = models.FloatField(null=True, blank=True)
