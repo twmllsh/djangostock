@@ -1433,13 +1433,17 @@ class DBUpdater:
         tickers = DBUpdater.update_ticker()
         
         from dashboard.utils.mystock import Stock
-        
+        err_cnt = 0
         ls = []
         for item in tickers:
+            if err_cnt > 50:
+                print('err가 50개 넘어 중지')
+                break
             try:
                 stock = Stock(item['code'], anal=anal)
             except:
                 print("stock객체 생성 실패. " , item['name'])
+                err_cnt +=1
                 continue
             
             info_dic = {}
