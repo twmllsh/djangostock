@@ -1418,7 +1418,7 @@ class DBUpdater:
         ## to_create 자료가지고 데이터 만들어 메세지 보내기
 
     
-    def anal_all_stock(anal=True):
+    def anal_all_stock(anal=True, cnt =None):
         # 전체 분석해서 저장하기. Chartvalues()
         check_y1, check_y2 = ElseInfo.check_y_future
         check_q = ElseInfo.check_q_current[-1]
@@ -1431,7 +1431,9 @@ class DBUpdater:
         update_fields = [field for field in update_fields if field !='id']
 
         tickers = DBUpdater.update_ticker()
-        
+        if not cnt:
+            tickers = random.choices(tickers, k=cnt)
+            print(f"{cnt} 개 작업시작!")
         from dashboard.utils.mystock import Stock
         err_cnt = 0
         ls = []

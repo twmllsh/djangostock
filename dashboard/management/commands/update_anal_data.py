@@ -6,7 +6,7 @@ class Command(BaseCommand):
  
     def handle(self, *args, **options):
         
-        DBUpdater.anal_all_stock()
+        DBUpdater.anal_all_stock(cnt=10)
         
         
        
