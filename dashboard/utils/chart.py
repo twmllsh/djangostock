@@ -184,41 +184,55 @@ class Line:
             f"{self.name}_변곡점",
             f"{self.name}_변곡점_변화량",
         )
+        ## 상장된지얼마 안된종목을 위한 예외처리
+        try:
+            self.current_value = self.data.iloc[-1]
+            self.current_direction = (
+                "up"
+                if data.iloc[-2] < self.data.iloc[-1] and data.iloc[-3] < self.data.iloc[-1]
+                else "down"
+            )  # 방향. 2일 연속 만족해야 인정.
+        except:
+            self.current_value = None
+            self.current_direction = 'down'
+            
+        try:    
+            self.df_curve = pd.DataFrame(self.data)
+            self.df_curve[f"{self.name}_변화량"] = self.data.pct_change()
+            self.df_curve = pd.concat(
+                [
+                    self.df_curve,
+                    self._add_low_high(
+                        self.df_curve[self.name], ignore_cnt=self._ignore_cnt
+                    ),
+                ],
+                axis=1,
+            )
+            self.df_all_low_points, self.df_all_high_points, self.df_last_low_points = (
+                self._get_low_high_points(allow_rate=self._allow_rate)
+            )
+        except:
+            self.df_curve = pd.DataFrame(self.data)
+            self.df_all_low_points, self.df_all_high_points, self.df_last_low_points = (pd.DataFrame(),pd.DataFrame(),pd.DataFrame())
 
-        self.current_value = self.data.iloc[-1]
-        self.current_direction = (
-            "up"
-            if data.iloc[-2] < self.data.iloc[-1] and data.iloc[-3] < self.data.iloc[-1]
-            else "down"
-        )  # 방향. 2일 연속 만족해야 인정.
+        try:
+            self.inclination20 = self.df_curve[f"{self.name}"].pct_change(20)
+            self.inclination20.name = f"{self.name}_inclination20"
+            self.inclination10 = self.df_curve[f"{self.name}"].pct_change(10)
+            self.inclination10.name = f"{self.name}_inclination10"
 
-        self.df_curve = pd.DataFrame(self.data)
-        self.df_curve[f"{self.name}_변화량"] = self.data.pct_change()
-        self.df_curve = pd.concat(
-            [
-                self.df_curve,
-                self._add_low_high(
-                    self.df_curve[self.name], ignore_cnt=self._ignore_cnt
-                ),
-            ],
-            axis=1,
-        )
-        self.df_all_low_points, self.df_all_high_points, self.df_last_low_points = (
-            self._get_low_high_points(allow_rate=self._allow_rate)
-        )
-
-        self.inclination20 = self.df_curve[f"{self.name}"].pct_change(20)
-        self.inclination20.name = f"{self.name}_inclination20"
-        self.inclination10 = self.df_curve[f"{self.name}"].pct_change(10)
-        self.inclination10.name = f"{self.name}_inclination10"
-
-        self.inclination20_value = round(
-            self.inclination20.iloc[-1] * 100, 1
-        )  ## 편평도.
-        self.inclination10_value = round(
-            self.inclination10.iloc[-1] * 100, 1
-        )  ## 편평도.
-
+            self.inclination20_value = round(
+                self.inclination20.iloc[-1] * 100, 1
+            )  ## 편평도.
+            self.inclination10_value = round(
+                self.inclination10.iloc[-1] * 100, 1
+            )  ## 편평도.
+        except Exception as e:
+            self.inclination20_value, self.inclination10_value = None, None
+            self.inclination20, self.inclination10 = pd.Series(), pd.Series()
+            
+            
+            
     def _add_low_high(self, series, ignore_cnt=0):
         """
         return df
@@ -900,13 +914,15 @@ class Sun:
         s_max.name, s_min.name = "max", "min"
         self.line_max = Line(s_max)
         self.line_min = Line(s_min)
+        ## 데이터 적은 종목을 위한 예외처리
+        try:
+            self.two_line = self.line_max - self.line_min
 
-        self.two_line = self.line_max - self.line_min
-
-        self.width = round(self.two_line.width.iloc[-1], 1)
-        self.cur_max_value = int(s_max.iloc[-1])
-        self.cur_min_value = int(s_min.iloc[-1])
-
+            self.width = round(self.two_line.width.iloc[-1], 1)
+            self.cur_max_value = int(s_max.iloc[-1])
+            self.cur_min_value = int(s_min.iloc[-1])
+        except:
+            pass
     def get_attr(self, start_except_word="__"):
         pattern = f"^{start_except_word}"
         return [item for item in dir(self) if re.match(pattern, item)]

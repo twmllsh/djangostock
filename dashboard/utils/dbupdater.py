@@ -1417,9 +1417,132 @@ class DBUpdater:
         asyncio.run(mydiscord.send_message(f"update_stockplus_news finished......"))
         ## to_create 자료가지고 데이터 만들어 메세지 보내기
 
-    def anal_all_stock():
+    
+    def anal_all_stock(anal=True):
+        # 전체 분석해서 저장하기. Chartvalues()
+        check_y1, check_y2 = ElseInfo.check_y_future
+        check_q = ElseInfo.check_q_current[-1]
+        all_cnt = 0
+        exist_qs_dict = {item.ticker.code : item for item in ChartValue.objects.all()}
+        to_create=[]
+        to_update=[]
+
+        update_fields = [field.name for field in ChartValue._meta.get_fields() if not isinstance(field, models.OneToOneField) ]
+        update_fields = [field for field in update_fields if field !='id']
+
+        tickers = DBUpdater.update_ticker()
+        
+        from dashboard.utils.mystock import Stock
+        
+        ls = []
+        for item in tickers:
+            try:
+                stock = Stock(item['code'], anal=anal)
+            except:
+                print("stock객체 생성 실패. " , item['name'])
+                continue
+            
+            info_dic = {}
+            info_dic['ticker'] = stock.ticker
+            
+            if isinstance(stock.fin_df, pd.DataFrame):
+                df_y = stock.fin_df.set_index('year')
+                info_dic["growth_y1"] = df_y.loc[int(check_y1), 'growth'] if int(check_y1) in df_y.index else None 
+                info_dic['growth_y2'] = df_y.loc[int(check_y2), 'growth'] if int(check_y2) in df_y.index else None 
+            if isinstance(stock.fin_df_q, pd.DataFrame):
+                df_q = stock.fin_df_q
+                info_dic['growth_q'] = df_q.loc[check_q, 'yoy'] if check_q in df_q.index else None 
+
+            
+            bb_texts = ['bb60','bb240']
+            for chart_name in ['chart_d','chart_30','chart_5']:
+                if hasattr(stock, chart_name):
+                    chart = getattr(stock, chart_name)
+                    for bb_text in bb_texts:
+                        if hasattr(chart, bb_text):
+                            bb = getattr(chart, bb_text)
+                            info_dic[f"{chart_name}_{bb_text}_upper20"] = bb.upper_inclination20 if hasattr(bb, "upper_inclination20") else None
+                            info_dic[f"{chart_name}_{bb_text}_upper10"] = bb.upper_inclination10 if hasattr(bb, "upper_inclination10") else None
+                            info_dic[f"{chart_name}_{bb_text}_upper"] = bb.cur_upper_value if hasattr(bb, "cur_upper_value") else None
+                            info_dic[f"{chart_name}_{bb_text}_width"] = bb.cur_width if hasattr(bb, "cur_width") else None
+            
+                    info_dic[f"{chart_name}_sun_width"] = chart.sun.width if hasattr(chart, 'sun') else None
+                    info_dic[f"{chart_name}_new_phase"] = chart.is_new_phase()
+                    info_dic[f"{chart_name}_ab"] = chart.is_ab(ma=20) if hasattr(chart, f'ma{20}') else None
+                    info_dic[f"{chart_name}_ab_v"] = chart.is_ab_volume()
+                    info_dic[f"{chart_name}_good_array"] = chart.is_good_array()
+            
+                    info_dic['reasons'] = ""
+                    if chart_name=='chart_d':
+                        info_dic['reasons'] += 'is_w20_3w ' if chart.is_w20_3w() else ''
+                        info_dic['reasons'] += 'is_w3_ac ' if chart.is_w3_ac() else ''
+                        info_dic['reasons'] += 'is_sun_ac ' if chart.is_sun_ac(n봉전이내=4) else ''
+                        info_dic['reasons'] += 'is_coke_ac ' if chart.is_coke_ac(n봉전이내=4) else ''
+                        info_dic['reasons'] += 'is_multi_through ' if chart.is_multi_through(n봉전이내=4) else ''
+                        info_dic['reasons'] += 'is_abc ' if chart.is_abc() else ''
+                        info_dic['reasons'] += 'is_coke_gcv ' if chart.is_coke_gcv(bb_width=60) else ''
+                        info_dic['reasons'] += 'is_sun_gcv ' if chart.is_sun_gcv() else ''
+                        info_dic['reasons'] += 'is_rsi ' if chart.is_rsi() else ''
+                        info_dic['reasons'] += 'is_new_phase ' if chart.is_new_phase() else ''
+            
+            ls.append(info_dic)
+
+            
+            if item['code'] in exist_qs_dict:
+                chartvalue = exist_qs_dict.get(item['code'])
+                for field in update_fields:
+                    setattr(chartvalue, f"{field}", info_dic.get(f"{field}"))
+                to_update.append(chartvalue)
+            else:
+                chartvalue = ChartValue(**info_dic)
+                to_create.append(chartvalue)
+
+
+            if (len(to_create) + len(to_update)) > 100:
+                with transaction.atomic():
+                    if to_update:
+                        update_fields = [field.name for field in ChartValue._meta.get_fields() if not isinstance(field, models.OneToOneField) ]
+                        update_fields = [field for field in update_fields if field !='id']
+                        ChartValue.objects.bulk_update(to_update, update_fields)
+                        print(f"updated 완료 {len(to_update)} ")
+                        print(to_update)
+                        all_cnt += len(to_update)
+                
+                    if to_create:
+                        ChartValue.objects.bulk_create(to_create)
+                        print(f"created 완료 {len(to_create)} ")
+                        print(to_create)
+                        all_cnt += len(to_create)
+                
+                print(f"updated : {len(to_update)} created : {len(to_create)}")
+                to_create=[]
+                to_update=[]
+
+        with transaction.atomic():
+            if to_update:
+                update_fields = [field.name for field in ChartValue._meta.get_fields() if not isinstance(field, models.OneToOneField) ]
+                update_fields = [field for field in update_fields if field !='id']
+                ChartValue.objects.bulk_update(to_update, update_fields)
+                print(f"updated 완료 {len(to_update)} ")
+                print(to_update)
+                all_cnt += len(to_update)
+
+            if to_create:
+                ChartValue.objects.bulk_create(to_create)
+                print(f"created 완료 {len(to_create)} ")
+                print(to_create)
+                all_cnt += len(to_create)
+
+        print(f"updated : {len(to_update)} created : {len(to_create)}")
+        print(f"{all_cnt}개 데이터 처리 완료")
+    
+    
+    
+    def choice_stock():
         
         # option 장중: 장후:
+        # Chartvalue 에서 데이터 정제해서 가져오기. 
+        
         
         # 장중에서는 어떻게든 codes list 만들어서 전달. 
         ## 1. 어제분석한 내용 바탕. ( fdr 실시간 데이터.)
@@ -1427,15 +1550,13 @@ class DBUpdater:
         ## 3. 조건검색 바탕. (kis 필요)
         # update ohlcv 하고. 
         
+        
         # Stock 객체 만들고. 
         
-        # 특정 값들 추출하고. 
+        ## 특정조건이면 추출하기. 
         
-        ## model 로 객체 만들고.  날짜 포함. 
-        
-        # model update 하고. 
-        
-        ## 특정 조건 맞는거 찾아보고 . 
+    
+        # 
         
         ## 옵션에 따라 메세지 보내고. 
         
