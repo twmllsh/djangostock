@@ -1443,6 +1443,7 @@ class DBUpdater:
                 break
             try:
                 stock = Stock(item['code'], anal=anal)
+                print(item['name'])
             except:
                 print("stock객체 생성 실패. " , item['name'])
                 err_cnt +=1

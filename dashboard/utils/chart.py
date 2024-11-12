@@ -2113,12 +2113,14 @@ class Chart:
     # abc
     def is_abc(self, verbose=False):
         result = False
-
-        # 큰거래중 4프로이상만 추출
-        big_ac_df = self.volume_big.big_volume_df.loc[
-            self.volume_big.big_volume_df["Change"] >= 0.04
-        ]
-
+        try:
+            # 큰거래중 4프로이상만 추출
+            big_ac_df = self.volume_big.big_volume_df.loc[
+                self.volume_big.big_volume_df["Change"] >= 0.04
+            ]
+        except:
+            return result
+        
         exist_df = pd.DataFrame()
         if self.is_w_a_short(with_vol=False):
             if len(self.ma3.df_last_low_points) >= 2:
