@@ -421,19 +421,52 @@ class News(models.Model):
         return f"<News {self.title}"
 
 
-# class ChartValue(models.Model):
-#     ticker = models.OneToOneField(Ticker, on_delete=models.CASCADE)
-#     sun_max = models.FloatField()
-#     sun_min = models.FloatField()
-#     sun_width = models.FloatField()
-#     bb_upper =  models.FloatField()
-#     bb_lower =  models.FloatField()
-#     is_3w = models.IntegerField() # 0 : False , 1~ 지속일. 
-#     is_3wa = models.BooleanField()
-#     is_5w = models.IntegerField() # 0 : False , 1~ 지속일. 
-#     is_5wa = models.BooleanField()
-#     ## 편평도. new_phase, w 일때 사이에 ac, 20ma, 60ma, bb_upper, sun_max, 존재여부. 
+class ChartValue(models.Model):
+    ticker = models.OneToOneField(Ticker, on_delete=models.CASCADE)
+    growth_y1 = models.FloatField(null=True, blank=True)
+    growth_y2 = models.FloatField(null=True, blank=True)
+    growth_q = models.FloatField(null=True, blank=True)
+    chart_d_bb60_upper20 = models.FloatField(null=True, blank=True)
+    chart_d_bb60_upper10 = models.FloatField(null=True, blank=True)
+    chart_d_bb60_upper = models.FloatField(null=True, blank=True)
+    chart_d_bb60_width = models.FloatField(null=True, blank=True)
+    chart_d_bb240_upper20 = models.FloatField(null=True, blank=True)
+    chart_d_bb240_upper10 = models.FloatField(null=True, blank=True)
+    chart_d_bb240_upper = models.FloatField(null=True, blank=True)
+    chart_d_bb240_width = models.FloatField(null=True, blank=True)
+    chart_d_sun_width = models.FloatField(null=True, blank=True)
+    chart_d_new_phase = models.BooleanField(null=True)
+    chart_d_ab = models.BooleanField(null=True)
+    chart_d_ab_v = models.BooleanField(null=True)
+    chart_d_good_array = models.BooleanField(null=True)
+    reasons = models.TextField(blank=True)
+    chart_30_bb60_upper20 = models.FloatField(null=True, blank=True)
+    chart_30_bb60_upper10 = models.FloatField(null=True, blank=True)
+    chart_30_bb60_upper = models.FloatField(null=True, blank=True)
+    chart_30_bb60_width = models.FloatField(null=True, blank=True)
+    chart_30_bb240_upper20 = models.FloatField(null=True, blank=True)
+    chart_30_bb240_upper10 =models.FloatField(null=True, blank=True)
+    chart_30_bb240_upper = models.FloatField(null=True, blank=True)
+    chart_30_bb240_width = models.FloatField(null=True, blank=True)
+    chart_30_sun_width = models.FloatField(null=True, blank=True)
+    chart_30_new_phase = models.BooleanField(null=True)
+    chart_30_ab = models.BooleanField(null=True)
+    chart_30_ab_v = models.BooleanField(null=True)
+    chart_30_good_array = models.BooleanField(null=True)
+    chart_5_bb60_upper20 = models.FloatField(null=True, blank=True)
+    chart_5_bb60_upper10 = models.FloatField(null=True, blank=True)
+    chart_5_bb60_upper = models.FloatField(null=True, blank=True)
+    chart_5_bb60_width = models.FloatField(null=True, blank=True)
+    chart_5_bb240_upper20 = models.FloatField(null=True, blank=True)
+    chart_5_bb240_upper10 = models.FloatField(null=True, blank=True)
+    chart_5_bb240_upper = models.FloatField(null=True, blank=True)
+    chart_5_bb240_width = models.FloatField(null=True, blank=True)
+    chart_5_sun_width = models.FloatField(null=True, blank=True)
+    chart_5_new_phase = models.BooleanField(null=True)
+    chart_5_ab = models.BooleanField(null=True)
+    chart_5_ab_v = models.BooleanField(null=True)
+    chart_5_good_array = models.BooleanField(null=True)
+        
     
-    
-    
-    
+    def __str__(self):
+        return f"{self.ticker.name} {self.reasons[:10]}"

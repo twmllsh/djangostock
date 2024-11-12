@@ -508,26 +508,25 @@ class Stock:
             df_q = self.fin_df_q
             info_dic['growth_q'] = df_q.loc[check_q, 'yoy'] if check_q in df_q.index else None 
         
-        bb_texts = ['bb60','bb240']
         for chart_name in ['chart_d','chart_30','chart_5']:
             if hasattr(self, chart_name):
-                chart = getattr(self, chart_name)
-                for bb_text in bb_texts:
-                    if hasattr(chart, bb_text):
-                        bb = getattr(chart, bb_text)
-                        info_dic[f"{bb_text}_upper20"] = bb.upper_inclination20
-                        info_dic[f"{bb_text}_upper10"] = bb.upper_inclination10
-                        info_dic[f"{bb_text}_width"] = bb.cur_width
+                bb_texts = ['bb60','bb240']
+                for chart_name in ['chart_d','chart_30','chart_5']:
+                    if hasattr(self, chart_name):
+                        chart = getattr(self, chart_name)
+                        for bb_text in bb_texts:
+                            if hasattr(chart, bb_text):
+                                bb = getattr(chart, bb_text)
+                                info_dic[f"{chart_name}_{bb_text}_upper20"] = bb.upper_inclination20 if hasattr(bb, "upper_inclination20") else None
+                                info_dic[f"{chart_name}_{bb_text}_upper10"] = bb.upper_inclination10 if hasattr(bb, "upper_inclination10") else None
+                                info_dic[f"{chart_name}_{bb_text}_width"] = bb.cur_width if hasattr(bb, "cur_width") else None
+            info_dic[f"{chart_name}_sun_width"] = chart.sun.width if hasattr(chart, 'sun') else None
+
+        info_dic[f"{chart_name}_new_phase"] = chart.is_new_phase()
+        info_dic[f"{chart_name}_ab"] = chart.is_ab(ma=20)
+        info_dic[f"{chart_name}_ab_v"] = chart.is_ab_volume()
+        info_dic[f"{chart_name}_good_array"] = chart.is_good_array()
         
-        info_dic[f"sun_width"] = chart.sun.width if hasattr(chart, 'sun') else None
-        
-        
-        
-        if not hasattr(self, 'chart_5'):
-            self.chart_5 = GetData._get_ohlcv_from_daum(
-            code=self.code, data_type="5분봉"
-        ) 
-        chart = getattr(self, 'chart_5')
         
            
         
@@ -938,7 +937,7 @@ class Stock:
         
         return layout
 
-    def plot1(self, option='day', cnt=180):
+    def plot1(self, option='day', cnt=180, investor=True):
         title = f'{self.ticker.name}({self.ticker.code})'
         ## data 준비. 
         if option == "day":
@@ -968,9 +967,10 @@ class Stock:
         df: pd.DataFrame = chart_obj.df.iloc[-cnt:].copy()
         df = df.reset_index()
         if option =='day':
-            start_date = df['Date'].iloc[0]
-            investor_part = self.investor_part.loc[self.investor_part['start'] >= start_date]
-            investor_part = investor_part.reset_index(drop=True)
+            if isinstance(self.investor_part, pd.DataFrame):
+                start_date = df['Date'].iloc[0]
+                investor_part = self.investor_part.loc[self.investor_part['start'] >= start_date]
+                investor_part = investor_part.reset_index(drop=True)
         
         sun_min = chart_obj.sun.line_min.data.reset_index().iloc[-cnt:] if hasattr(chart_obj.sun, 'line_min') else None
         sun_max = chart_obj.sun.line_max.data.reset_index().iloc[-cnt:] if hasattr(chart_obj.sun, 'line_max') else None
@@ -1169,37 +1169,38 @@ class Stock:
         
         ## investor_part plot
         if option =='day':
-            if isinstance(investor_part, pd.DataFrame):
-                import math
-                # color_palette = ['lightcoral','lightpink']
-                # group_cnt = len(investor_part['group'].unique())
-                # color_palette = color_palette * math.ceil(group_cnt/len(color_palette))
-                            
-                investor_part['text'] = '주도기관: ' + investor_part['주도기관'] + '<br>' + \
-                '순매수금(억): ' + investor_part['순매수금_억'].map(lambda x: f"{x:.1f}") + '<br>' +  \
-                '매집비: ' + investor_part['매집비'].map(lambda x: f"{x:.1f}%") + '<br>' +  \
-                '풀매수기관: ' + investor_part['풀매수기관'].map(lambda x: ','.join(x) if not type(float) else '')
-                 
-                try:
-                    investor_part['group_color'] = np.where(investor_part['group'] % 2 == 0, 'lightcoral', 'lightpink')
-                except:
-                    investor_part['group_color'] = 'blue'
+            if investor:
+                if isinstance(investor_part, pd.DataFrame):
+                    import math
+                    # color_palette = ['lightcoral','lightpink']
+                    # group_cnt = len(investor_part['group'].unique())
+                    # color_palette = color_palette * math.ceil(group_cnt/len(color_palette))
+                                
+                    investor_part['text'] = '주도기관: ' + investor_part['주도기관'] + '<br>' + \
+                    '순매수금(억): ' + investor_part['순매수금_억'].map(lambda x: f"{x:.1f}") + '<br>' +  \
+                    '매집비: ' + investor_part['매집비'].map(lambda x: f"{x:.1f}%") + '<br>' +  \
+                    '풀매수기관: ' + investor_part['풀매수기관'].map(lambda x: ','.join(x) if not type(float) else '')
+                    
+                    try:
+                        investor_part['group_color'] = np.where(investor_part['group'] % 2 == 0, 'lightcoral', 'lightpink')
+                    except:
+                        investor_part['group_color'] = 'blue'
 
-                annotations = [dict(
-                    x=row['start'], 
-                    y = row['ma3'], 
-                    text=row['text'],showarrow=True ,
-                    ax=0, ay=40,
-                    font=dict(color='black', size=8),
-                    bgcolor=row['group_color'],  # 배경 색상
-                    # bgcolor='lightpink',  # 배경 색상
-                    # bordercolor='black',    # 테두리 색상
-                    # borderwidth=2,          # 테두리 두께
-                    opacity=0.8,             # 투명도
-                    )
-                for _, row in investor_part.iterrows()]
-                fig.update_layout(annotations=annotations)
-                
+                    annotations = [dict(
+                        x=row['start'], 
+                        y = row['ma3'], 
+                        text=row['text'],showarrow=True ,
+                        ax=0, ay=40,
+                        font=dict(color='black', size=8),
+                        bgcolor=row['group_color'],  # 배경 색상
+                        # bgcolor='lightpink',  # 배경 색상
+                        # bordercolor='black',    # 테두리 색상
+                        # borderwidth=2,          # 테두리 두께
+                        opacity=0.8,             # 투명도
+                        )
+                    for _, row in investor_part.iterrows()]
+                    fig.update_layout(annotations=annotations)
+                    
         
         '''
         fig = stock.plot1()

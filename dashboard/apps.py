@@ -8,6 +8,7 @@ from dashboard.utils.discord_bot import MyDiscordBot
 
 
 class StockDashboardConfig(AppConfig):
+# class DashboardConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'dashboard'
     verbose_name = '주식정보'
