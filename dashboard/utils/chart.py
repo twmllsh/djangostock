@@ -3,15 +3,11 @@ import re
 import warnings
 import numpy as np
 import pandas as pd
-
 # warnings.filterwarnings('ignore')
 import talib
 from datetime import datetime
-
 from bokeh.models import DatetimeTickFormatter, Span, TableColumn, DataTable
 import itertools
-
-
 from bokeh.plotting import figure, show
 from bokeh.models import ColumnDataSource, Range1d, RangeTool, FactorRange
 from bokeh.models import HoverTool, CustomJS
@@ -19,10 +15,8 @@ from bokeh.models import Span, Label
 from bokeh.layouts import gridplot, column, row
 from bokeh.models.formatters import NumeralTickFormatter
 from bokeh.models import SingleIntervalTicker, AdaptiveTicker
-
 # from bokeh.io import output_notebook
 # output_notebook()
-
 
 class LineCross:
     """
@@ -50,8 +44,6 @@ class LineCross:
     def is_gcv(self, n=2, verbose=False):
         """
         n : gc이후 v 개수 n 이하조건
-
-
         """
         result = False
         cond_array = self.cross_status == "정배열"  # short 이 정배열인상태조건

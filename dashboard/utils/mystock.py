@@ -139,47 +139,21 @@ class Stock:
         # fin status
         self.fin_df, self.fin_df_q = self.get_fin_status()
         
-        # ## 연간 매출액, 영업이익, 당기순이익 데이터 가져오기. ==> models에 함수로 이동하기
-        # fin: Finstats = self.ticker.finstats_set
-        # fin_y_qs = fin.filter(fintype="연결연도", quarter=0).values(
-        #     "year", "매출액", "영업이익", "당기순이익"
-        # )
-        # fin_qs_q = (
-        #     fin.exclude(quarter=0)
-        #     .filter(fintype="연결분기")
-        #     .values("year", "quarter", "매출액", "영업이익", "당기순이익")
-        # )
-
-        # self.fin_df = pd.DataFrame(fin_y_qs) if fin_y_qs else None
-        # self.fin_df_q = pd.DataFrame(fin_qs_q) if fin_qs_q else None
-        # # if fin_df:
-        # if self.fin_df is not None and (isinstance(self.fin_df, pd.DataFrame) and not self.fin_df.empty):
-        #     self.fin_df.set_index("year")
-        # # if self.fin_df_q:
-        # if self.fin_df_q is not None and (isinstance(self.fin_df_q, pd.DataFrame) and not self.fin_df_q.empty):
-        #     self.fin_df_q["index"] = (
-        #         self.fin_df_q["year"].astype(str)
-        #         + "/"
-        #         + self.fin_df_q["quarter"].astype(str).str.zfill(2)
-        #     )
-        #     self.fin_df_q = self.fin_df_q.set_index("index")
        
-    
     def get_fin_status(self):
-        
         
         def _get_성장율(data, gap=1):
             ''' 적자 = -10000, 턴어라운드 = -1000'''
             new_data = []
             for i in range(len(data)):
                 if i > 0:
-                    cur = data[i]
+                    cur = data.iloc[i]
                     if cur is None:
                         value = None
                         new_data.append(value)
                         continue
                     try:
-                        pre = data[i-gap]
+                        pre = data.iloc[i-gap]
                     except:
                         value = None
                         new_data.append(value)
@@ -199,7 +173,7 @@ class Stock:
                             new_data.append(value)
                             continue
                 else:
-                    cur= data[i]
+                    cur= data.iloc[i]
                     if cur is not None:
                         if cur < 0 :
                             value = -10000
