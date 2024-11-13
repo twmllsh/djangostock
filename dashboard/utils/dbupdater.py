@@ -533,7 +533,11 @@ class DBUpdater:
         if (codes is not None) and (len(codes) <= 200):
             temp_today = pd.Timestamp.now().strftime('%Y-%m-%d')
             if not Ohlcv.objects.filter(Date__in=[temp_today]).exists(): ## 오늘날짜 없으면 전체 먼저 업데이트!
-                DBUpdater.update_ohlcv() 
+                today_df = DBUpdater.update_ohlcv() 
+                
+                '''
+                ['Date', 'Open', 'High', 'Low', 'Close', 'Volume', 'Amount', 'Change','code']
+                '''
             ################### fdr 방식. ########################################
             print('fdr async 작동!')
             semaphore = asyncio.Semaphore(5) 
@@ -662,6 +666,7 @@ class DBUpdater:
         #### 특정일 (오늘) 양봉데이터만 받기.
         # the_date= pd.Timestamp().now().date()
         # the_data = Ohlcv.objects.filter(date='2024-09-27').select_related('ticker')
+        concat_df = concat_df[concat_df['Date'] == concat_df['Date'].max()]
         return concat_df
     
     def update_basic_info(test_cnt: int = None, update_codes=None):
@@ -1422,8 +1427,9 @@ class DBUpdater:
     def anal_all_stock(anal=True):
         # 전체 분석해서 저장하기. Chartvalues()
         '''codes ['code','code',...]'''
+        from dashboard.utils.chart import Chart
+        today_df = DBUpdater.update_ohlcv()
         
-        DBUpdater.update_ohlcv()
         check_y1, check_y2 = ElseInfo.check_y_future
         check_q = ElseInfo.check_q_current[-1]
         all_cnt = 0
@@ -1437,7 +1443,6 @@ class DBUpdater:
 
         codes = DBUpdater.update_ticker()
         
-        ls = []
         for item in codes:
             stock = Stock(item['code'], anal=True)
             info_dic = {}
@@ -1455,7 +1460,7 @@ class DBUpdater:
             bb_texts = ['bb60','bb240']
             for chart_name in ['chart_d','chart_30','chart_5']:
                 if hasattr(stock, chart_name):
-                    chart = getattr(stock, chart_name)
+                    chart : Chart = getattr(stock, chart_name)
                     for bb_text in bb_texts:
                         if hasattr(chart, bb_text):
                             bb = getattr(chart, bb_text)
@@ -1479,35 +1484,43 @@ class DBUpdater:
                     info_dic['reasons'] += 'is_w20_3w ' if chart.is_w20_3w() else ''
                     info_dic['reasons'] += 'is_w3_ac ' if chart.is_w3_ac() else ''
                     try:
-                        info_dic['reasons'] += 'is_sun_ac ' if chart.is_sun_ac(n봉전이내=4) else ''
+                        if chart.is_sun_ac(n봉전이내=4):
+                            info_dic['reasons'] += 'is_sun_ac '
                     except:
                         pass
                     try:
-                        info_dic['reasons'] += 'is_coke_ac ' if chart.is_coke_ac(n봉전이내=4) else ''
+                        if chart.is_coke_ac(n봉전이내=4):
+                            info_dic['reasons'] += 'is_coke_ac '
                     except:
                         pass
                     try:
-                        info_dic['reasons'] += 'is_multi_through ' if chart.is_multi_through(n봉전이내=4) else ''
+                        if chart.is_multi_through(n봉전이내=4):
+                            info_dic['reasons'] += 'is_multi_through ' 
                     except:
                         pass
                     try:
-                        info_dic['reasons'] += 'is_abc ' if chart.is_abc() else ''
+                        if chart.is_abc():
+                            info_dic['reasons'] += 'is_abc ' 
                     except:
                         pass
                     try:
-                        info_dic['reasons'] += 'is_coke_gcv ' if chart.is_coke_gcv(bb_width=60) else ''
+                        if chart.is_coke_gcv(bb_width=60):
+                            info_dic['reasons'] += 'is_coke_gcv ' 
                     except:
                         pass
                     try:
-                        info_dic['reasons'] += 'is_sun_gcv ' if chart.is_sun_gcv() else ''
+                        if chart.is_sun_gcv():
+                            info_dic['reasons'] += 'is_sun_gcv ' 
                     except:
                         pass
                     try:
-                        info_dic['reasons'] += 'is_rsi ' if chart.is_rsi() else ''
+                        if chart.is_rsi():
+                            info_dic['reasons'] += 'is_rsi ' 
                     except:
                         pass
                     try:
-                        info_dic['reasons'] += 'is_new_phase ' if chart.is_new_phase() else ''
+                        if chart.is_new_phase():
+                            info_dic['reasons'] += 'is_new_phase ' 
                     except:
                         pass
                     
@@ -1527,7 +1540,7 @@ class DBUpdater:
                     except:
                         pass
                     try:
-                        info_dic['reasons_30'] += 'is_multi_through ' if chart.is_multi_through(n봉전이내=4) else ''
+                        info_dic['reasons_30'] += 'is_multi_through ' if chart.is_multi_through(n봉전이내=10) else ''
                     except:
                         pass
                     try:
@@ -1550,10 +1563,7 @@ class DBUpdater:
                         info_dic['reasons_30'] += 'is_new_phase ' if chart.is_new_phase(short_ma=10) else ''
                     except:
                         pass
-                    
-                
-            ls.append(info_dic)
-
+  
             
             if item['code'] in exist_qs_dict:
                 chartvalue = exist_qs_dict.get(item['code'])
@@ -1606,13 +1616,36 @@ class DBUpdater:
     def choice_stock():
         
         # option 장중: 장후:
+        # 0~6프로 종목 선정
+        codes_6 = []
+        for _ in range(5):
+            try:
+                today_df = DBUpdater.update_ohlcv()
+                break
+            except:
+                print('DBUpdater.update_ohlcv() 재시도.')
+                time.sleep(5)
+        today_df  = today_df.loc[(today_df['Change'] > 0)  & (today_df['Change'] >= 6) ]
+        if len(today_df):
+            codes_6 = list(today_df['code'])
         # Chartvalue 에서 데이터 정제해서 가져오기. 
-        codes = ['005930', '000660']
+        codes_my_cond = []
+        
+        # codes_6 와 codes_my_cond 로 조합해야함. 
+        codes = []
         
         # 장중에서는 어떻게든 codes list 만들어서 전달. 
-        DBUpdater.update_ohlcv(codes=codes)
+        for _ in range(5):
+            try:
+                df = DBUpdater.update_ohlcv(codes=codes)
+                break
+            except:
+                print('DBUpdater.update_ohlcv(codes) 재시도 ')
+                time.sleep(5)
+        
+        codes = list(df['code'])
         ## 1. 어제분석한 내용 바탕. ( fdr 실시간 데이터.)
-        for code in codes:
+        for code in codes_my_cond:
             stock=Stock(code)
             # 기존데이터 바탕으로 분석 시작. ex upper 를 뚫었다던지. 
                 
