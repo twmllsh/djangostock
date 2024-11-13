@@ -1445,6 +1445,7 @@ class DBUpdater:
         
         for item in codes:
             ## 임시로 없는 데이터들만 작업.
+            print(item['name'], end=',')
             if item['code'] in exist_qs_dict:
                 continue
             
