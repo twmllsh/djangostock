@@ -1019,22 +1019,24 @@ class Stock:
             ), row=1, col=1)
 
 
-        # 매물대 수평선 추가
-        price_values = chart_obj.pricelevel.first, chart_obj.pricelevel.second
-        
-        widths = [2,1]
-        for value, width in zip(price_values, widths):
-            if not value is None:
-                fig.add_shape(type='line',
-                            x0=chart_obj.pricelevel.start_date, x1=chart_obj.pricelevel.end_date,  # x축 범위 설정
-                            y0=value, y1=value,  # y축 값 설정
-                            line=dict(
-                                color='purple', 
-                                width=width, 
-                                # dash='dash',
-                            ),  # 선의 스타일 설정
-                            row=1, col=1)  # 첫 번째 서브플롯에 수평선 추가
-
+        # 매물대 수평선 추가 매물대가 하나일때도 있어서 일단 예외처리로 막아놓음. 
+        try:
+            price_values = chart_obj.pricelevel.first, chart_obj.pricelevel.second
+            
+            widths = [2,1]
+            for value, width in zip(price_values, widths):
+                if not value is None:
+                    fig.add_shape(type='line',
+                                x0=chart_obj.pricelevel.start_date, x1=chart_obj.pricelevel.end_date,  # x축 범위 설정
+                                y0=value, y1=value,  # y축 값 설정
+                                line=dict(
+                                    color='purple', 
+                                    width=width, 
+                                    # dash='dash',
+                                ),  # 선의 스타일 설정
+                                row=1, col=1)  # 첫 번째 서브플롯에 수평선 추가
+        except:
+            pass
         ##############################################################################################
 
         ## 거래량 바차트
