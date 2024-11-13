@@ -1444,6 +1444,10 @@ class DBUpdater:
         codes = DBUpdater.update_ticker()
         
         for item in codes:
+            ## 임시로 없는 데이터들만 작업.
+            if item['code'] in exist_qs_dict:
+                continue
+            
             stock = Stock(item['code'], anal=True)
             info_dic = {}
             info_dic['ticker'] = stock.ticker

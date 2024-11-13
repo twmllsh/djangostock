@@ -111,12 +111,20 @@ class Stock:
         )
         if anal:
             # 5 30 받아서 chart 생성 . 후 필요한 값만 가져오기.
-            self.ohlcv_30 = GetData._get_ohlcv_from_daum(
-                code=self.code, data_type="30분봉"
-            )
-            self.ohlcv_5 = GetData._get_ohlcv_from_daum(
-                code=self.code, data_type="5분봉"
-            )
+            for _ in range(5):
+                try:
+                    self.ohlcv_30 = GetData._get_ohlcv_from_daum(
+                        code=self.code, data_type="30분봉"
+                    )
+                    self.ohlcv_5 = GetData._get_ohlcv_from_daum(
+                        code=self.code, data_type="5분봉"
+                    )
+                    break
+                except:
+                    print('30분봉데이터 다운실패 5초 기다림.')
+                    import time
+                    time.sleep(5)
+
             if isinstance(self.ohlcv_30, pd.DataFrame):
                 self.chart_30 = chart.Chart(
                     self.ohlcv_30,
@@ -132,7 +140,16 @@ class Stock:
                     상장주식수=self.상장주식수,
                     유동주식수=self.유동주식수,
                 )
-
+                  
+            if not hasattr(self, 'chart_30'):
+                print('30분봉데이터 생성 실패~')
+                anal=False
+            if not hasattr(self, 'chart_5'):
+                print('5분봉데이터 생성 실패~')
+                anal=False
+                    
+    
+        
         # investor
         self.investor_part = self.get_investor_part()
 
