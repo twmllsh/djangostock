@@ -1425,6 +1425,22 @@ class DBUpdater:
 
     
     def anal_all_stock(anal=True):
+        
+        
+        
+        def _create_and_update(to_create, to_update, update_fields):
+            with transaction.atomic():
+                if to_update:
+                    ChartValue.objects.bulk_update(to_update, update_fields)
+                    print(f"updated 완료 {len(to_update)} ")
+                    print(to_update)
+
+                if to_create:
+                    ChartValue.objects.bulk_create(to_create)
+                    print(f"created 완료 {len(to_create)} ")
+                    print(to_create)
+            print(f"updated : {len(to_update)} created : {len(to_create)}")
+        
         # 전체 분석해서 저장하기. Chartvalues()
         '''codes ['code','code',...]'''
         from dashboard.utils.chart import Chart
@@ -1437,18 +1453,18 @@ class DBUpdater:
         to_create=[]
         to_update=[]
 
-
         update_fields = [field.name for field in ChartValue._meta.get_fields() if not isinstance(field, models.OneToOneField) ]
         update_fields = [field for field in update_fields if field !='id']
-
+        
         codes = DBUpdater.update_ticker()
         
         for item in codes:
+        
             ## 임시로 없는 데이터들만 작업.
             print(item['name'], end=',')
             if item['code'] in exist_qs_dict:
                 continue
-            
+
             stock = Stock(item['code'], anal=True)
             info_dic = {}
             info_dic['ticker'] = stock.ticker
@@ -1461,7 +1477,6 @@ class DBUpdater:
                 df_q = stock.fin_df_q
                 info_dic['growth_q'] = df_q.loc[check_q, 'yoy'] if check_q in df_q.index else None 
 
-            
             bb_texts = ['bb60','bb240']
             for chart_name in ['chart_d','chart_30','chart_5']:
                 if hasattr(stock, chart_name):
@@ -1528,8 +1543,7 @@ class DBUpdater:
                             info_dic['reasons'] += 'is_new_phase ' 
                     except:
                         pass
-                    
-            
+
                 if chart_name=='chart_30':
                     try:
                         info_dic['reasons_30'] += 'is_w20_3w ' if chart.is_w20_3w() else ''
@@ -1568,8 +1582,7 @@ class DBUpdater:
                         info_dic['reasons_30'] += 'is_new_phase ' if chart.is_new_phase(short_ma=10) else ''
                     except:
                         pass
-  
-            
+
             if item['code'] in exist_qs_dict:
                 chartvalue = exist_qs_dict.get(item['code'])
                 for field in update_fields:
@@ -1581,43 +1594,18 @@ class DBUpdater:
 
 
             if (len(to_create) + len(to_update)) > 100:
-                with transaction.atomic():
-                    if to_update:
-                        update_fields = [field.name for field in ChartValue._meta.get_fields() if not isinstance(field, models.OneToOneField) ]
-                        update_fields = [field for field in update_fields if field !='id']
-                        ChartValue.objects.bulk_update(to_update, update_fields)
-                        print(f"updated 완료 {len(to_update)} ")
-                        print(to_update)
-                        all_cnt += len(to_update)
-                
-                    if to_create:
-                        ChartValue.objects.bulk_create(to_create)
-                        print(f"created 완료 {len(to_create)} ")
-                        print(to_create)
-                        all_cnt += len(to_create)
-                
-                print(f"updated : {len(to_update)} created : {len(to_create)}")
+                _create_and_update(to_create, to_update, update_fields)
                 to_create=[]
                 to_update=[]
+                
+        if (len(to_create) + len(to_update)) > 0:
+            _create_and_update(to_create, to_update, update_fields)
+                
 
-        with transaction.atomic():
-            if to_update:
-                update_fields = [field.name for field in ChartValue._meta.get_fields() if not isinstance(field, models.OneToOneField) ]
-                update_fields = [field for field in update_fields if field !='id']
-                ChartValue.objects.bulk_update(to_update, update_fields)
-                print(f"updated 완료 {len(to_update)} ")
-                print(to_update)
-                all_cnt += len(to_update)
+  
 
-            if to_create:
-                ChartValue.objects.bulk_create(to_create)
-                print(f"created 완료 {len(to_create)} ")
-                print(to_create)
-                all_cnt += len(to_create)
-
-        print(f"updated : {len(to_update)} created : {len(to_create)}")
-        print(f"{all_cnt}개 데이터 처리 완료")    
-    
+            
+        
     def choice_stock():
         
         # option 장중: 장후:
