@@ -369,7 +369,8 @@ class Stock:
                 1,
             )
             # inf 값을 10000으로 대체
-            df.replace([np.inf, -np.inf], 10000, inplace=True)
+            # df.replace([np.inf, -np.inf], 10000, inplace=True)
+            temp_df.replace([np.inf, -np.inf], 10000, inplace=True)
             grouped_temp_df["full"] = (
                 (grouped_temp_df["순매수거래대금"] == grouped_temp_df["매수거래대금"])
                 & (grouped_temp_df["순매수거래대금"] != 0)
