@@ -1611,28 +1611,28 @@ class PriceLevel:
         df : ohlcv , parts : 구분
         return : list 240거래일기준 가장많은 매물대 1, 2위 가격.
         """
-        df = df[-period:].copy()
-        self.start_date , self.end_date= df.index[0], df.index[-1] # 범위
-        df = df[["Close", "Open", "High", "Low", "Volume"]]
-        all_v = df["Volume"].sum()
-        df["rate_v"] = df["Volume"] / all_v
-        # df['mprice']= (df['High'] + df['Low']) /2
-        df["mprice"] = (df["High"] + df["Low"] + df["Open"] + df["Close"]) / 4
-        max_price = df["High"].max()
-        min_price = df["Low"].min()
-        bins = np.linspace(min_price, max_price, parts)
-        labels = [str(int((bins[i] + bins[i + 1]) / 2)) for i in range(len(bins) - 1)]
         try:
+            df = df[-period:].copy()
+            self.start_date , self.end_date= df.index[0], df.index[-1] # 범위
+            df = df[["Close", "Open", "High", "Low", "Volume"]]
+            all_v = df["Volume"].sum()
+            df["rate_v"] = df["Volume"] / all_v
+            # df['mprice']= (df['High'] + df['Low']) /2
+            df["mprice"] = (df["High"] + df["Low"] + df["Open"] + df["Close"]) / 4
+            max_price = df["High"].max()
+            min_price = df["Low"].min()
+            bins = np.linspace(min_price, max_price, parts)
+            labels = [str(int((bins[i] + bins[i + 1]) / 2)) for i in range(len(bins) - 1)]
             df["bin"] = pd.cut(df["mprice"], bins=bins, labels=labels)
+            result = (
+                df.groupby("bin", observed=True)
+                .sum()["rate_v"]
+                .sort_values(ascending=False)
+            )
+            return [int(index) for index in result.index[0:2]]
+
         except:
             return None, None
-        result = (
-            df.groupby("bin", observed=True)
-            .sum()["rate_v"]
-            .sort_values(ascending=False)
-        )
-
-        return [int(index) for index in result.index[0:2]]
 
 
 class Chart:
