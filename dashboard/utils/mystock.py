@@ -469,41 +469,7 @@ class Stock:
             return temp_dic
 
     ################  기술적 분석  ######################3
-    def get_data(self):
-        info_dic= {}
-        check_y1, check_y2 = ElseInfo.check_y_future
-        check_q = ElseInfo.check_q_current[-1]
-        
-        if isinstance(self.fin_df, pd.DataFrame):
-            df_y = self.fin_df.set_index('year')
-            info_dic["growth_y1"] = df_y.loc[int(check_y1), 'growth'] if int(check_y1) in df_y.index else None 
-            info_dic['growth_y2'] = df_y.loc[int(check_y2), 'growth'] if int(check_y2) in df_y.index else None 
-        if isinstance(self.fin_df_q, pd.DataFrame):
-            df_q = self.fin_df_q
-            info_dic['growth_q'] = df_q.loc[check_q, 'yoy'] if check_q in df_q.index else None 
-        
-        for chart_name in ['chart_d','chart_30','chart_5']:
-            if hasattr(self, chart_name):
-                bb_texts = ['bb60','bb240']
-                for chart_name in ['chart_d','chart_30','chart_5']:
-                    if hasattr(self, chart_name):
-                        chart = getattr(self, chart_name)
-                        for bb_text in bb_texts:
-                            if hasattr(chart, bb_text):
-                                bb = getattr(chart, bb_text)
-                                info_dic[f"{chart_name}_{bb_text}_upper20"] = bb.upper_inclination20 if hasattr(bb, "upper_inclination20") else None
-                                info_dic[f"{chart_name}_{bb_text}_upper10"] = bb.upper_inclination10 if hasattr(bb, "upper_inclination10") else None
-                                info_dic[f"{chart_name}_{bb_text}_width"] = bb.cur_width if hasattr(bb, "cur_width") else None
-            info_dic[f"{chart_name}_sun_width"] = chart.sun.width if hasattr(chart, 'sun') else None
-
-        info_dic[f"{chart_name}_new_phase"] = chart.is_new_phase()
-        info_dic[f"{chart_name}_ab"] = chart.is_ab(ma=20)
-        info_dic[f"{chart_name}_ab_v"] = chart.is_ab_volume()
-        info_dic[f"{chart_name}_good_array"] = chart.is_good_array()
-        
-        
-           
-        
+    
         
     def is_good_consen(self, pct=0.3):
         ''' 현재 년도대비 다음년도 성장율 (연결연도 영업이익 기준 ) pct '''

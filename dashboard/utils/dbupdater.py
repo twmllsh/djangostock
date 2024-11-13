@@ -26,6 +26,7 @@ from django.db import DatabaseError
 from django.db import connection
 from dashboard.models import *
 from dashboard.utils.sean_func import Text_mining
+from dashboard.utils.mystock import Stock, ElseInfo
 from .message import My_discord
 
 mydiscord = My_discord()
@@ -1427,31 +1428,18 @@ class DBUpdater:
         to_create=[]
         to_update=[]
 
+
         update_fields = [field.name for field in ChartValue._meta.get_fields() if not isinstance(field, models.OneToOneField) ]
         update_fields = [field for field in update_fields if field !='id']
 
-        tickers = DBUpdater.update_ticker()
-        if not cnt:
-            tickers = random.choices(tickers, k=cnt)
-            print(f"{cnt} 개 작업시작!")
-        from dashboard.utils.mystock import Stock
-        err_cnt = 0
+        codes = DBUpdater.update_ticker()
+        
         ls = []
-        for item in tickers:
-            if err_cnt > 50:
-                print('err가 50개 넘어 중지')
-                break
-            try:
-                stock = Stock(item['code'], anal=anal)
-                print(item['name'])
-            except:
-                print("stock객체 생성 실패. " , item['name'])
-                err_cnt +=1
-                continue
-            
+        for item in codes:
+            stock = Stock(item['code'], anal=True)
             info_dic = {}
             info_dic['ticker'] = stock.ticker
-            
+            info_dic['cur_price'] = stock.chart_d.df.Close.iloc[-1]
             if isinstance(stock.fin_df, pd.DataFrame):
                 df_y = stock.fin_df.set_index('year')
                 info_dic["growth_y1"] = df_y.loc[int(check_y1), 'growth'] if int(check_y1) in df_y.index else None 
@@ -1464,7 +1452,7 @@ class DBUpdater:
             bb_texts = ['bb60','bb240']
             for chart_name in ['chart_d','chart_30','chart_5']:
                 if hasattr(stock, chart_name):
-                    chart  = getattr(stock, chart_name)
+                    chart = getattr(stock, chart_name)
                     for bb_text in bb_texts:
                         if hasattr(chart, bb_text):
                             bb = getattr(chart, bb_text)
@@ -1472,42 +1460,95 @@ class DBUpdater:
                             info_dic[f"{chart_name}_{bb_text}_upper10"] = bb.upper_inclination10 if hasattr(bb, "upper_inclination10") else None
                             info_dic[f"{chart_name}_{bb_text}_upper"] = bb.cur_upper_value if hasattr(bb, "cur_upper_value") else None
                             info_dic[f"{chart_name}_{bb_text}_width"] = bb.cur_width if hasattr(bb, "cur_width") else None
-            
-                    info_dic[f"{chart_name}_sun_width"] = chart.sun.width if hasattr(chart, 'sun') else None
+
+                    if hasattr(chart, 'sun'):
+                        sun = getattr(chart, 'sun')
+                        info_dic[f"{chart_name}_sun_width"] = chart.sun.width if hasattr(sun, 'width') else None
                     info_dic[f"{chart_name}_new_phase"] = chart.is_new_phase()
                     info_dic[f"{chart_name}_ab"] = chart.is_ab(ma=20) if hasattr(chart, f'ma{20}') else None
                     info_dic[f"{chart_name}_ab_v"] = chart.is_ab_volume()
                     info_dic[f"{chart_name}_good_array"] = chart.is_good_array()
             
-                    info_dic['reasons'] = ""
-                    if chart_name=='chart_d':
-                        info_dic['reasons'] += 'is_w20_3w ' if chart.is_w20_3w() else ''
-                        info_dic['reasons'] += 'is_w3_ac ' if chart.is_w3_ac() else ''
+                info_dic['reasons'] = ""
+                info_dic['reasons_30'] = ""
+                
+                if chart_name=='chart_d':
+                    info_dic['reasons'] += 'is_w20_3w ' if chart.is_w20_3w() else ''
+                    info_dic['reasons'] += 'is_w3_ac ' if chart.is_w3_ac() else ''
+                    try:
                         info_dic['reasons'] += 'is_sun_ac ' if chart.is_sun_ac(n봉전이내=4) else ''
+                    except:
+                        pass
+                    try:
                         info_dic['reasons'] += 'is_coke_ac ' if chart.is_coke_ac(n봉전이내=4) else ''
+                    except:
+                        pass
+                    try:
                         info_dic['reasons'] += 'is_multi_through ' if chart.is_multi_through(n봉전이내=4) else ''
+                    except:
+                        pass
+                    try:
                         info_dic['reasons'] += 'is_abc ' if chart.is_abc() else ''
+                    except:
+                        pass
+                    try:
                         info_dic['reasons'] += 'is_coke_gcv ' if chart.is_coke_gcv(bb_width=60) else ''
+                    except:
+                        pass
+                    try:
                         info_dic['reasons'] += 'is_sun_gcv ' if chart.is_sun_gcv() else ''
+                    except:
+                        pass
+                    try:
                         info_dic['reasons'] += 'is_rsi ' if chart.is_rsi() else ''
+                    except:
+                        pass
+                    try:
                         info_dic['reasons'] += 'is_new_phase ' if chart.is_new_phase() else ''
+                    except:
+                        pass
                     
-                    info_dic['reasons_30'] = ""
-                    if chart_name=='chart_30':
+            
+                if chart_name=='chart_30':
+                    try:
                         info_dic['reasons_30'] += 'is_w20_3w ' if chart.is_w20_3w() else ''
-                        info_dic['reasons_30'] += 'is_w3_ac ' if chart.is_w3_ac() else ''
-                        info_dic['reasons_30'] += 'is_sun_ac ' if chart.is_sun_ac(n봉전이내=4) else ''
-                        info_dic['reasons_30'] += 'is_coke_ac ' if chart.is_coke_ac(n봉전이내=4) else ''
+                    except:
+                        pass
+                    
+                    try:
+                        info_dic['reasons_30'] += 'is_sun_ac ' if chart.is_sun_ac(n봉전이내=10) else ''
+                    except:
+                        pass
+                    try:
+                        info_dic['reasons_30'] += 'is_coke_ac ' if chart.is_coke_ac(n봉전이내=10) else ''
+                    except:
+                        pass
+                    try:
                         info_dic['reasons_30'] += 'is_multi_through ' if chart.is_multi_through(n봉전이내=4) else ''
+                    except:
+                        pass
+                    try:
                         info_dic['reasons_30'] += 'is_abc ' if chart.is_abc() else ''
-                        info_dic['reasons_30'] += 'is_coke_gcv ' if chart.is_coke_gcv(bb_width=60) else ''
-                        info_dic['reasons_30'] += 'is_sun_gcv ' if chart.is_sun_gcv() else ''
-                        info_dic['reasons_30'] += 'is_rsi ' if chart.is_rsi() else ''
-                        info_dic['reasons_30'] += 'is_new_phase ' if chart.is_new_phase() else ''
-
+                    except:
+                        pass
+                    try:
+                        info_dic['reasons_30'] += 'is_coke_gcv ' if chart.is_coke_gcv(ma=10, bb_width=30) else ''
+                    except:
+                        pass
+                    try:
+                        info_dic['reasons_30'] += 'is_sun_gcv ' if chart.is_sun_gcv(ma=10) else ''
+                    except:
+                        pass
+                    try:
+                        info_dic['reasons_30'] += 'is_rsi ' if chart.is_rsi(short_ma=10) else ''
+                    except:
+                        pass
+                    try:
+                        info_dic['reasons_30'] += 'is_new_phase ' if chart.is_new_phase(short_ma=10) else ''
+                    except:
+                        pass
                     
-                    
-                    
+                
             ls.append(info_dic)
 
             
@@ -1557,9 +1598,7 @@ class DBUpdater:
                 all_cnt += len(to_create)
 
         print(f"updated : {len(to_update)} created : {len(to_create)}")
-        print(f"{all_cnt}개 데이터 처리 완료")
-    
-    
+        print(f"{all_cnt}개 데이터 처리 완료")    
     
     def choice_stock():
         

@@ -1837,7 +1837,8 @@ class Chart:
             )
             result = cond1 & cond2 & cond3
         except Exception as e:
-            print("chart.w3_ac() 에서 오류", e)
+            print("ma3정보가 없음 이 데이터는 분봉! ") if verbose else None
+            return result
 
         (
             print(
@@ -1900,7 +1901,7 @@ class Chart:
                 < self.sun.two_line.line1.data.iloc[n - 1]
                 < self.df["Close"].iloc[n]
             )
-            cur_width = self.sun.two_line.width[n]
+            cur_width = self.sun.two_line.width.iloc[n]
             cond_width = cur_width <= sun_width
             cond_up = self.df["Open"].iloc[n] < self.df["Close"].iloc[n]
             if with_ac:
@@ -2008,7 +2009,7 @@ class Chart:
             ma60: Ma = getattr(self, "ma60")
             for n봉전 in range(n봉전이내 + 1):
                 n = -(n봉전) - 1
-                if pd.notna(ma20.data[n]) and pd.notna(ma60.data[n]):
+                if pd.notna(ma20.data.iloc[n]) and pd.notna(ma60.data.iloc[n]):
                     ma20_current_value = ma20.data.iloc[n]
                     ma60_current_value = ma60.data.iloc[n]
                     cond_through1 = (
@@ -2149,7 +2150,7 @@ class Chart:
                     print("dates", exist_df.index) if verbose else None
                     print("cnt ", len(exist_df)) if verbose else None
 
-        return result, exist_df
+        return result #, exist_df
 
     def is_coke_gcv(self, ma=3, bb_ma=240, with_ac=True, bb_width=50, verbose=False):
         """
@@ -2244,25 +2245,26 @@ class Chart:
         """
         pass
 
-    def is_rsi(self, option="new_phase", verbose=False):
+    def is_rsi(self, short_ma=3, option="new_phase", verbose=False):
         """
         보완해야할점. 차트에서는 정배열이어야함 또는 new_phase,
         option : new_phase, good_array, 'all', 'any'
         """
+        short_ma_str = f"ma{short_ma}"
         result = False
 
         if option == "new_phase":
-            option_cond = self.is_new_phase(verbose=verbose)
+            option_cond = self.is_new_phase(short_ma=short_ma, verbose=verbose)
             print("new_phase_cond : ", option_cond) if verbose else None
         elif option == "array_cond":
             option_cond = self.is_good_array(option="perfect")
             print("is_good_array : ", option_cond) if verbose else None
         elif option == "all":
-            option_cond = self.is_new_phase(verbose=verbose) & self.is_good_array(
+            option_cond = self.is_new_phase(short_ma=short_ma, verbose=verbose) & self.is_good_array(
                 "perfect"
             )
         elif option == "any":
-            option_cond = self.is_new_phase(verbose=verbose) | self.is_good_array(
+            option_cond = self.is_new_phase(short_ma=short_ma, verbose=verbose) | self.is_good_array(
                 "perfect"
             )
         else:
@@ -2277,15 +2279,22 @@ class Chart:
             result = True
         return result
 
-    def is_new_phase(self, verbose=False) -> bool:
+    def is_new_phase(self,short_ma : int = 3,  bb : int = 240, verbose=False) -> bool:
         """
         코크 방향이 하방이 아니고.
         코크돌파 경험이 있고(너비 60 이하에서)
         그 돌파시 종가보다 현재가가 높고.
         아직 3일선이 20선 위에있는 종목들
         """
+        bb_text = f"bb{bb}"
         result = False
-
+        if hasattr(self, bb_text):
+            bb240 = getattr(self, bb_text)
+            if hasattr(bb240, 'line_upper'):
+                line_upper = getattr(bb240, 'line_upper')
+            else:
+                return False
+        
         if "bb240" not in dir(self):
             print("have no bb240")
             return False
@@ -2293,8 +2302,11 @@ class Chart:
             print("have no bb240.line_upper") if verbose else None
             return False
             # cond_upper_direct = self.upper_inclination20 > -1
-        cond_upper_direct = self.bb240.line_upper.inclination20_value > -1
-
+        
+        cond_upper_direct = self.bb240.line_upper.inclination20_value > -1 if hasattr(line_upper, 'inclination20_value') else False
+        if not cond_upper_direct:
+            return False
+            
         temp_df = self.df.iloc[-120:]
 
         upper_data = self.bb240.line_upper.data.iloc[-120:]
@@ -2314,6 +2326,7 @@ class Chart:
             cond_coke_width | change_rate_cond
         )
 
+        short_ma_str = f"ma{short_ma}"
         # print('만족데이터',temp_df.loc[all_cond])
         if sum(all_cond):
             temp_price = temp_df.loc[all_cond].iloc[0]["Close"]  ## 돌파시 종가체크하기.
@@ -2321,35 +2334,36 @@ class Chart:
             # print('돌파시 종가',temp_df.loc[all_cond].index[0], temp_price)
             # else:
             #     cond_price = False
-
-            try:
-                cond_current_status1 = (
-                    self.ma3.data.iloc[-1] >= self.ma60.data.iloc[-1]
-                )  ## 아직 3선이 60선위에 있는것만.
-            except:
+            if hasattr(self, short_ma_str):
+                s_ma = getattr(self, short_ma_str)
                 try:
                     cond_current_status1 = (
-                        self.ma3.data.iloc[-1] >= self.ma20.data.iloc[-1]
+                        s_ma.data.iloc[-1] >= self.ma60.data.iloc[-1]
+                    )  ## 아직 3선이 60선위에 있는것만.
+                except:
+                    try:
+                        cond_current_status1 = (
+                            s_ma.data.iloc[-1] >= self.ma20.data.iloc[-1]
+                        )
+                    except:
+                        print("ma 오류")
+                        cond_current_status1 = False
+
+                try:
+                    cond_current_status2 = (s_ma.is_w() | self.ma5.is_w()) & (
+                        s_ma.data.iloc[-1] >= self.ma240.data.iloc[-1]
                     )
                 except:
-                    print("ma 오류")
-                    cond_current_status1 = False
+                    cond_current_status2 = False
 
-            try:
-                cond_current_status2 = (self.ma3.is_w() | self.ma5.is_w()) & (
-                    self.ma3.data.iloc[-1] >= self.ma240.data.iloc[-1]
-                )
-            except:
-                cond_current_status2 = False
+                cond_current_status = (
+                    cond_current_status1 | cond_current_status2
+                )  # 60선위에 있거나 240위에서 w를 그린것.
 
-            cond_current_status = (
-                cond_current_status1 | cond_current_status2
-            )  # 60선위에 있거나 240위에서 w를 그린것.
+                cond_coke = cond_current_status & cond_upper_direct & cond_price
 
-            cond_coke = cond_current_status & cond_upper_direct & cond_price
-
-            if cond_coke:
-                result = True
+                if cond_coke:
+                    result = True
 
         return result
 

@@ -423,6 +423,7 @@ class News(models.Model):
 
 class ChartValue(models.Model):
     ticker = models.OneToOneField(Ticker, on_delete=models.CASCADE)
+    cur_price = models.FloatField(null=True, blank=True)
     growth_y1 = models.FloatField(null=True, blank=True)
     growth_y2 = models.FloatField(null=True, blank=True)
     growth_q = models.FloatField(null=True, blank=True)
