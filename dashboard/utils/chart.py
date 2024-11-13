@@ -1606,7 +1606,7 @@ class PriceLevel:
         the_values = self._get_price_level(df, period=120) # 6개월
         ## 유동적으로 속성 지정. 
         names= ['first','second']
-        for i in range(the_values):
+        for i in range(len(the_values)):
             setattr(self, f'{names[i]}')
 
     def _get_price_level(self, df, parts=10, period=240):
