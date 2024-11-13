@@ -530,7 +530,7 @@ class DBUpdater:
         str_dates = [date.strftime("%Y%m%d") for date in dates]
         print(f"{str_dates} data downlaod....!")
         
-        if (codes is not None) and (len(codes) <= 100):
+        if (codes is not None) and (len(codes) <= 200):
             temp_today = pd.Timestamp.now().strftime('%Y-%m-%d')
             if not Ohlcv.objects.filter(Date__in=[temp_today]).exists(): ## 오늘날짜 없으면 전체 먼저 업데이트!
                 DBUpdater.update_ohlcv() 
@@ -1419,8 +1419,11 @@ class DBUpdater:
         ## to_create 자료가지고 데이터 만들어 메세지 보내기
 
     
-    def anal_all_stock(anal=True, cnt =None):
+    def anal_all_stock(anal=True):
         # 전체 분석해서 저장하기. Chartvalues()
+        '''codes ['code','code',...]'''
+        
+        DBUpdater.update_ohlcv()
         check_y1, check_y2 = ElseInfo.check_y_future
         check_q = ElseInfo.check_q_current[-1]
         all_cnt = 0
@@ -1604,10 +1607,15 @@ class DBUpdater:
         
         # option 장중: 장후:
         # Chartvalue 에서 데이터 정제해서 가져오기. 
-        
+        codes = ['005930', '000660']
         
         # 장중에서는 어떻게든 codes list 만들어서 전달. 
+        DBUpdater.update_ohlcv(codes=codes)
         ## 1. 어제분석한 내용 바탕. ( fdr 실시간 데이터.)
+        for code in codes:
+            stock=Stock(code)
+            # 기존데이터 바탕으로 분석 시작. ex upper 를 뚫었다던지. 
+                
         ## 2. 오늘 등락율 바탕. (pystock 지연데이터 )
         ## 3. 조건검색 바탕. (kis 필요)
         # update ohlcv 하고. 
